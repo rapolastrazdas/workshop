@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import CardSearch from "../components/CardSearch.vue"
+import CardInfoDialog from '../components/CardInfoDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { api, ApiError } from '../auth'
+import type { CardInfo } from '../cards'
 import { consumeImport, type DeckCard, type DeckDetail, type DeckWrite, type ImportResult } from '../decks'
 import DeckColors from '../components/DeckColors.vue'
 import ImportResultDialog from '../components/ImportResultDialog.vue'
@@ -20,6 +22,16 @@ type ListName = DeckCard['list_name']
 type Action = 'add' | 'decrease' | 'remove' | 'move'
 const saving = ref(false)
 const editError = ref('')
+const selectedCard = ref<{ id: string; info?: CardInfo } | null>(null)
+
+function openCard(id: string, info?: CardInfo) {
+  editError.value = ''
+  selectedCard.value = { id, info }
+}
+
+function selectedQuantity(list: ListName) {
+  return deck.value?.cards?.find(card => card.oracle_id === selectedCard.value?.id && card.list_name === list)?.quantity ?? 0
+}
 
 async function edit(oracle_id: string, list_name: ListName, action: Action) {
   const current = deck.value
@@ -99,6 +111,7 @@ watch(() => route.params.id, (id) => {
   deck.value = null
   report.value = consumeImport(Number(id))
   settingsOpen.value = false
+  selectedCard.value = null
   void load()
 }, { immediate: true })
 </script>
@@ -113,13 +126,31 @@ watch(() => route.params.id, (id) => {
       <button class="button" @click="load">Bandyti dar kartą</button>
     </div>
     <template v-else-if="deck">
-      <CardSearch>
+      <CardSearch editor @select="card => openCard(card.id, card.info)">
         <template #actions="{ card }">
           <button class="button" :disabled="saving || loading" @click="edit(card.id, 'main', 'add')">+ Pagrindinis</button>
           <button class="button" :disabled="saving || loading" @click="edit(card.id, 'maybeboard', 'add')">+ Svarstomos</button>
         </template>
       </CardSearch>
-      <p v-if="editError" role="alert" class="error-banner">{{ editError }}</p>
+      <p v-if="editError && !selectedCard" role="alert" class="error-banner">{{ editError }}</p>
+      <CardInfoDialog v-if="selectedCard" :key="selectedCard.id" :card-id="selectedCard.id"
+        :initial="selectedCard.info" editor @close="selectedCard = null">
+        <div class="card-info-list-actions">
+          <div>
+            <button class="button" :disabled="saving || loading" @click="edit(selectedCard.id, 'main', 'add')">+ Pagrindinis</button>
+            <span aria-label="Kiekis pagrindinių kortų sąraše">{{ selectedQuantity('main') }}</span>
+            <button class="button" aria-label="Sumažinti pagrindinių kortų kiekį" :disabled="saving || loading || !selectedQuantity('main')"
+              @click="edit(selectedCard.id, 'main', 'decrease')">−</button>
+          </div>
+          <div>
+            <button class="button" :disabled="saving || loading" @click="edit(selectedCard.id, 'maybeboard', 'add')">+ Svarstomos</button>
+            <span aria-label="Kiekis svarstomų kortų sąraše">{{ selectedQuantity('maybeboard') }}</span>
+            <button class="button" aria-label="Sumažinti svarstomų kortų kiekį" :disabled="saving || loading || !selectedQuantity('maybeboard')"
+              @click="edit(selectedCard.id, 'maybeboard', 'decrease')">−</button>
+          </div>
+        </div>
+        <p v-if="editError" role="alert" class="error-banner">{{ editError }}</p>
+      </CardInfoDialog>
       <ImportResultDialog v-if="report && (report.unrecognized_lines.length || report.skipped_main)" :deck-id="deck.id" :deck-name="deck.name" :result="report" @close="report = null" @updated="imported" />
       <DeckSettingsDialog v-if="settingsOpen" :deck="deck" @close="settingsOpen = false" @saved="settingsSaved" />
       <div class="decks-heading">
@@ -139,7 +170,7 @@ watch(() => route.params.id, (id) => {
           <ul v-if="group.cards.length" class="deck-card-list">
             <li v-for="card in group.cards" :key="card.oracle_id">
               <span>{{ card.quantity }}×</span>
-              <span>{{ card.name ?? 'Nežinoma korta' }}</span>
+              <button class="deck-card-name" type="button" @click="openCard(card.oracle_id)">{{ card.name ?? 'Nežinoma korta' }}</button>
               <span class="deck-mana-cost">{{ card.mana_cost === null ? '—' : card.mana_cost }}</span>
               <div class="card-actions">
                 <button :disabled="saving || loading" aria-label="Padidinti kiekį" @click="edit(card.oracle_id, card.list_name, 'add')">+</button>
@@ -156,3 +187,9 @@ watch(() => route.params.id, (id) => {
     </template>
   </section>
 </template>
+
+<style scoped>
+.deck-card-name { text-align: left; text-decoration: underline; color: inherit; }
+.card-info-list-actions { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 18px; }
+.card-info-list-actions div { display: flex; align-items: center; gap: 8px; }
+</style>

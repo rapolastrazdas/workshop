@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { api } from '../auth'
-defineProps<{ collapsible?: boolean }>()
-type Hit = { id: string; name: string; type: string; image: string | null }
+import type { SearchHit } from '../cards'
+import CardInfoDialog from './CardInfoDialog.vue'
+const props = defineProps<{ collapsible?: boolean; editor?: boolean }>()
+const emit = defineEmits<{ select: [card: SearchHit] }>()
+const selected = ref<SearchHit | null>(null)
 const query = ref('')
-const cards = ref<Hit[]>([])
+const cards = ref<SearchHit[]>([])
 const total = ref(0)
 const visible = ref(8)
 const hidden = ref(false)
@@ -14,8 +17,13 @@ let submitted = ''
 let page = 0
 let more = false
 const displayed = computed(() => cards.value.slice(0, visible.value))
+function openCard(card: SearchHit) {
+  if (props.editor) emit('select', card)
+  else selected.value = card
+}
+
 async function fetchPage() {
-  const result = await api<{ cards: Hit[]; total: number; more: boolean }>(
+  const result = await api<{ cards: SearchHit[]; total: number; more: boolean }>(
     '/cards/search?q=' + encodeURIComponent(submitted) + '&page=' + (page + 1), {}, false)
   page++
   cards.value.push(...result.cards)
@@ -56,16 +64,21 @@ async function run(append: boolean) {
     <div v-if="!hidden">
       <ul v-if="displayed.length" class="search-results">
         <li v-for="card in displayed" :key="card.id">
-          <img v-if="card.image" :src="card.image" alt="" width="90" loading="lazy">
-          <strong>{{ card.name }}</strong><span>{{ card.type }}</span>
+          <button class="card-hit" type="button" @click="openCard(card)">
+            <img v-if="card.image" :src="card.image" alt="" width="90" loading="lazy">
+            <strong>{{ card.name }}</strong>
+          </button>
+          <span>{{ card.type }}</span>
           <slot name="actions" :card="card" />
         </li>
       </ul>
       <button v-if="visible < cards.length || more" class="button" :disabled="busy" @click="run(true)">Rodyti daugiau</button>
     </div>
+    <CardInfoDialog v-if="selected" :card-id="selected.id" :initial="selected.info" @close="selected = null" />
   </section>
 </template>
 <style scoped>
 .search-results { display: grid; grid-template-columns: repeat(auto-fill,minmax(145px,1fr)); gap: 1rem; list-style: none; padding: 0; }
 .search-results li { display: grid; align-content: start; gap: .4rem; }
+.card-hit { display: grid; gap: .4rem; justify-items: start; text-align: left; color: inherit; }
 </style>
