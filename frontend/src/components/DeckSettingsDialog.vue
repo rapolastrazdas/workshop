@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, ApiError, auth } from '../auth'
 import type { DeckSummary, DeckWrite } from '../decks'
 import { showNotice } from '../notices'
+import DeleteDeckDialog from './DeleteDeckDialog.vue'
 
 const props = defineProps<{ deck: DeckSummary }>()
 const emit = defineEmits<{ close: []; saved: [result: DeckWrite] }>()
@@ -14,6 +15,7 @@ const nameError = ref('')
 const listError = ref('')
 const message = ref('')
 const busy = ref(false)
+const deleting = ref(false)
 let previousFocus: HTMLElement | null = null
 
 onMounted(() => {
@@ -95,7 +97,8 @@ async function save() {
         <h3>Kaladės ištrynimas</h3>
         <p class="field-help">Ištrintos kaladės atkurti negalima.</p>
       </div>
-      <button class="button button-danger" type="button" disabled title="Kaladės ištrynimas dar nepasiekiamas.">Ištrinti kaladę</button>
+      <button class="button button-danger" type="button" :disabled="busy" @click="deleting = true">Ištrinti kaladę</button>
     </div>
+    <DeleteDeckDialog v-if="deleting" :deck="deck" @close="deleting = false" />
   </dialog>
 </template>
