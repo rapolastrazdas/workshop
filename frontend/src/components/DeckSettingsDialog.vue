@@ -78,7 +78,7 @@ async function save() {
       </div>
       <div class="field">
         <label for="settings-import">Kortų importas (nebūtinas)</label>
-        <p id="settings-import-help" class="field-help">Kortos bus pridėtos prie kaladės. Viena korta eilutėje: kiekis ir pavadinimas.</p>
+        <p id="settings-import-help" class="field-help">Kortos bus pridėtos prie kaladės. Viena korta eilutėje: kiekis ir pavadinimas. Leidimo kodas ir kolekcinis numeris, pvz., „1 Sol Ring (C21) 263“, nebūtini.</p>
         <textarea id="settings-import" v-model="cardList" rows="4" :disabled="busy" :aria-invalid="Boolean(listError)"
           :aria-describedby="listError ? 'settings-import-error settings-import-help' : 'settings-import-help'"
           placeholder="1 Bygone Bishop&#10;1 Trail of Evidence"></textarea>
