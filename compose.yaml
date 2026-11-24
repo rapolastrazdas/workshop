@@ -40,6 +40,16 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+  card-updater:
+    build: ./backend
+    command: ["python", "-m", "app.catalog_update", "--daily"]
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_CARDS_COLLECTION: ${QDRANT_CARDS_COLLECTION:-cards}
+    depends_on:
+      qdrant:
+        condition: service_started
+    restart: unless-stopped
 volumes:
   postgres_data:
   qdrant_data:

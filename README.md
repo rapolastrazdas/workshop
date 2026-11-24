@@ -19,6 +19,10 @@ docker compose up --build -d --wait
 ```
 
 Duomenų bazė ir jos lentelės paruošiamos automatiškai.
+Kortų katalogas pirmą kartą atsisiunčiamas fone, todėl kortų importas
+pradeda veikti užbaigus pirmą atsisiuntimą. Eigą rodo
+`docker compose logs card-updater`, rankinį patikrinimą paleidžia
+`docker compose exec -T card-updater python -m app.catalog_update`.
 
 Naršyklėje atidarykite **http://localhost:8080**.
 

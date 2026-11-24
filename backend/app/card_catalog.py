@@ -4,7 +4,7 @@ from uuid import UUID
 
 import httpx
 
-from .card_import import card_name_keys
+from .card_import import card_name_keys, normalize_card_name
 
 MANA_COLORS = ("W", "U", "B", "R", "G")
 
@@ -47,8 +47,8 @@ class CardCatalog:
     def find_by_names(self, names: set[str]) -> dict[str, str]:
         if not names:
             return {}
-        result = {}
-        ambiguous = set()
+        exact_matches: dict[str, set[str]] = {}
+        alias_matches: dict[str, set[str]] = {}
         keys = sorted(names)
         try:
             with httpx.Client(base_url=self.base_url, timeout=5.0) as client:
@@ -70,17 +70,19 @@ class CardCatalog:
                         for point in page["points"]:
                             oracle_id = str(UUID(str(point["id"])))
                             payload = point.get("payload") or {}
-                            aliases = payload.get("name_keys") or card_name_keys(payload.get("name", ""))
+                            name = payload.get("name", "")
+                            exact = normalize_card_name(name)
+                            aliases = payload.get("name_keys") or card_name_keys(name)
                             for key in requested.intersection(aliases):
-                                if key in result and result[key] != oracle_id:
-                                    ambiguous.add(key)
-                                result[key] = oracle_id
+                                matches = exact_matches if key == exact else alias_matches
+                                matches.setdefault(key, set()).add(oracle_id)
                         offset = page.get("next_page_offset")
                         if offset is None:
                             break
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             raise CardCatalogUnavailable from error
-        return {key: value for key, value in result.items() if key not in ambiguous}
+        preferred = {**alias_matches, **exact_matches}
+        return {key: next(iter(ids)) for key, ids in preferred.items() if len(ids) == 1}
 
 
 def get_card_catalog() -> CardCatalog:

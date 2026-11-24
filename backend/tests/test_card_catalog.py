@@ -44,6 +44,23 @@ def test_missing_collection_and_missing_metadata_are_unknown(monkeypatch):
     assert catalog.colors_for(set()) == {}
 
 
+def test_full_card_name_takes_priority_over_front_face_alias(monkeypatch):
+    original, other = str(UUID(int=1)), str(UUID(int=2))
+    catalog = mock_catalog(monkeypatch, lambda _: httpx.Response(200, json={"result": {
+        "points": [
+            {"id": original, "payload": {"name": "Lightning Bolt", "name_keys": ["lightning bolt"]}},
+            {"id": other, "payload": {
+                "name": "Lightning Bolt // Lightning Bolt",
+                "name_keys": ["lightning bolt", "lightning bolt // lightning bolt"],
+            }},
+        ],
+        "next_page_offset": None,
+    }}))
+    assert catalog.find_by_names({"lightning bolt", "lightning bolt // lightning bolt"}) == {
+        "lightning bolt": original, "lightning bolt // lightning bolt": other,
+    }
+
+
 @pytest.mark.parametrize("status", [429, 500, 503])
 def test_catalog_errors_are_reported(monkeypatch, status):
     catalog = mock_catalog(monkeypatch, lambda _: httpx.Response(status))
