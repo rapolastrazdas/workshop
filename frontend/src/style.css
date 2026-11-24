@@ -56,15 +56,45 @@ main { flex: 1; display: flex; flex-direction: column; }
 .site-footer a { text-decoration: none; }
 .site-footer a:hover { text-decoration: underline; }
 .guest-placeholder { flex: 1; }
-.decks-placeholder { width: 100%; max-width: 1168px; padding: 40px 24px; margin: 0 auto; flex: 1; }
-.decks-placeholder h1 { font-size: 26px; margin: 0; }
+.content-area { width: 100%; max-width: 1168px; padding: 40px 24px; margin: 0 auto; flex: 1; }
+.content-area h1 { font-size: 26px; margin: 0; overflow-wrap: anywhere; }
+.muted { color: #64748b; }
+.decks-heading, .heading-with-count { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.decks-heading { justify-content: space-between; margin-bottom: 28px; }
+.deck-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; list-style: none; margin: 0; padding: 0; }
+.deck-card { display: flex; flex-direction: column; min-height: 190px; height: 100%; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; text-decoration: none; }
+.deck-card:hover { border-color: #93c5fd; background: #f0f6ff; }
+.deck-card h2 { margin: 0 0 4px; font-size: 20px; line-height: 1.4; overflow-wrap: anywhere; }
+.deck-card p { margin: 0 0 24px; }
+.deck-colors { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 30px; }
+.deck-card .deck-colors { margin-top: auto; }
+.mana-list { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.mana-badge { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid #cbd5e1; border-radius: 50%; font-size: 14px; font-weight: 600; }
+.mana-w { background: #fff7db; color: #6b5315; }
+.mana-u { background: #dbeafe; color: #1e40af; }
+.mana-b { background: #334155; color: #fff; border-color: #334155; }
+.mana-r { background: #fee2e2; color: #991b1b; }
+.mana-g { background: #dcfce7; color: #166534; }
+.mana-c { background: #f1f5f9; color: #475569; }
+.color-status { font-size: 14px; }
+.empty-decks { text-align: center; padding: 56px 24px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #fff; }
+.empty-decks h2 { margin: 0 0 8px; font-size: 20px; }
+.empty-decks p { margin: 0; }
+.back-link { display: inline-block; margin-bottom: 24px; color: #1d4ed8; }
+.editor-placeholder { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e2e8f0; }
+.editor-placeholder h2 { font-size: 20px; margin: 0 0 12px; }
 .global-notice { width: min(420px, calc(100% - 48px)); margin: 24px auto 0; }
 .info-banner { padding: 12px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; color: #1e40af; font-size: 14px; }
 @media (max-width: 760px) {
+  .deck-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .site-header { padding: 16px; flex-direction: column; gap: 16px; }
   .site-header nav { justify-content: center; }
   .account-email { width: 100%; text-align: center; }
   .auth-area { padding: 32px 16px; }
   .auth-card { padding: 24px; }
   .site-footer { padding: 20px 16px; }
+}
+@media (max-width: 480px) {
+  .content-area { padding: 28px 16px; }
+  .deck-grid { grid-template-columns: minmax(0, 1fr); }
 }
