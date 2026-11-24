@@ -1,7 +1,8 @@
 ﻿# Urza's Workshop
 
 MTG kortų kaladžių kūrimo sistema. Šiuo metu veikia registracija,
-prisijungimas, atsijungimas ir paskyros ištrynimas. Kaladžių tvarkymas ir kortų paieška bus pridėti vėliau.
+prisijungimas, atsijungimas, paskyros ištrynimas ir savo kaladžių sąrašo peržiūra.
+Kaladžių kūrimas, redagavimas ir kortų paieška bus pridėti vėliau.
 
 ## Paleidimas su Docker
 

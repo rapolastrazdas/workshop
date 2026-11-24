@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { ApiError, auth, scheduleExpiry, verifySession } from './auth'
 import AuthView from './views/AuthView.vue'
 import HomeView from './views/HomeView.vue'
+import DecksView from './views/DecksView.vue'
+import DeckView from './views/DeckView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -9,8 +11,8 @@ export const router = createRouter({
     { path: '/', name: 'home', component: HomeView },
     { path: '/registracija', alias: '/register', name: 'register', component: AuthView, props: { mode: 'register' } },
     { path: '/prisijungimas', alias: '/login', name: 'login', component: AuthView, props: { mode: 'login' } },
-    { path: '/mano-kalades', alias: '/decks', name: 'decks', component: HomeView, meta: { requiresAuth: true } },
-    { path: '/kalades/:id', alias: '/decks/:id', name: 'deck', component: HomeView, meta: { requiresAuth: true } },
+    { path: '/mano-kalades', alias: '/decks', name: 'decks', component: DecksView, meta: { requiresAuth: true } },
+    { path: '/kalades/:id', alias: '/decks/:id', name: 'deck', component: DeckView, meta: { requiresAuth: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

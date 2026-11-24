@@ -1,33 +1,12 @@
 import time
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import event, select
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import Base, get_db, make_engine
-from app.main import app, fingerprint
-from app.models import AuthSession, Deck, User
+from app.main import fingerprint
+from app.models import AuthSession, Deck, DeckCard, User
 
 PASSWORD = "TvirtasSlaptazodis9!"
-
-
-@pytest.fixture
-def client():
-    engine = make_engine("sqlite://", poolclass=StaticPool)
-    Base.metadata.create_all(engine)
-    factory = sessionmaker(engine, expire_on_commit=False)
-
-    def db_override():
-        with factory() as db:
-            yield db
-
-    app.dependency_overrides[get_db] = db_override
-    with TestClient(app) as http:
-        yield http, factory
-    app.dependency_overrides.clear()
-    engine.dispose()
 
 
 def register(http, email="player@example.com", password=PASSWORD):
@@ -160,6 +139,9 @@ def test_account_deletion_removes_decks_and_all_sessions_only_for_owner(client):
             Deck(user_id=account["user"]["id"], name="Second deck"),
             Deck(user_id=other["user"]["id"], name="Other player's deck"),
         ])
+        db.flush()
+        for deck in db.scalars(select(Deck)):
+            db.add(DeckCard(deck_id=deck.id, oracle_id="00000000-0000-0000-0000-000000000001", quantity=4))
         db.commit()
     # A submitted user ID cannot redirect deletion to somebody else's account.
     response = http.request("DELETE", "/api/auth/account", headers=header(account["access_token"]),
@@ -169,6 +151,9 @@ def test_account_deletion_removes_decks_and_all_sessions_only_for_owner(client):
         assert db.get(User, account["user"]["id"]) is None
         assert db.get(User, other["user"]["id"]) is not None
         assert [deck.user_id for deck in db.scalars(select(Deck))] == [other["user"]["id"]]
+        remaining_cards = db.scalars(select(DeckCard)).all()
+        assert len(remaining_cards) == 1
+        assert db.get(Deck, remaining_cards[0].deck_id).user_id == other["user"]["id"]
         assert [session.user_id for session in db.scalars(select(AuthSession))] == [other["user"]["id"]]
     for token in [account["access_token"], second_token]:
         assert http.get("/api/auth/me", headers=header(token)).status_code == 401

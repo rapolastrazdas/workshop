@@ -12,14 +12,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+  qdrant:
+    image: qdrant/qdrant:v1.20.2
+    volumes:
+      - qdrant_data:/qdrant/storage
   backend:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-workshop}:${POSTGRES_PASSWORD:-workshop-local-only}@db:5432/${POSTGRES_DB:-workshop}
       SESSION_MINUTES: ${SESSION_MINUTES:-60}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_CARDS_COLLECTION: ${QDRANT_CARDS_COLLECTION:-cards}
     depends_on:
       db:
         condition: service_healthy
+      qdrant:
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 5s
@@ -34,3 +42,4 @@ services:
         condition: service_healthy
 volumes:
   postgres_data:
+  qdrant_data:

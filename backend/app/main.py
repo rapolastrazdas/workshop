@@ -13,7 +13,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import AuthSession, User
+from .models import AuthSession, Deck, DeckCard, User
+from .card_catalog import CardCatalog, CardCatalogUnavailable, MANA_COLORS, get_card_catalog
 
 app = FastAPI(title="Urza's Workshop", version="0.1.0")
 passwords = PasswordHash.recommended()
@@ -56,6 +57,49 @@ class SessionOut(BaseModel):
     token_type: str = "bearer"
     expires_at: int
     user: UserOut
+
+
+class DeckOut(BaseModel):
+    id: int
+    name: str
+    card_count: int
+    colors: list[str]
+    colors_known: bool
+
+
+class DeckListOut(BaseModel):
+    count: int
+    decks: list[DeckOut]
+
+
+Catalog = Annotated[CardCatalog, Depends(get_card_catalog)]
+
+
+def summarize_decks(db: Session, decks: list[Deck], catalog: CardCatalog) -> list[DeckOut]:
+    if not decks:
+        return []
+    main_cards = db.scalars(select(DeckCard).where(
+        DeckCard.deck_id.in_([deck.id for deck in decks]), DeckCard.list_name == "main",
+    )).all()
+    oracle_ids = {card.oracle_id for card in main_cards}
+    try:
+        colors_by_card = catalog.colors_for(oracle_ids) if oracle_ids else {}
+    except CardCatalogUnavailable:
+        raise HTTPException(503, "Nepavyko gauti kortų duomenų. Bandykite dar kartą.") from None
+    counts = {deck.id: 0 for deck in decks}
+    colors_by_deck: dict[int, set[str]] = {deck.id: set() for deck in decks}
+    known = {deck.id: True for deck in decks}
+    for card in main_cards:
+        counts[card.deck_id] += card.quantity
+        if card.oracle_id not in colors_by_card:
+            known[card.deck_id] = False
+        else:
+            colors_by_deck[card.deck_id].update(colors_by_card[card.oracle_id])
+    return [DeckOut(
+        id=deck.id, name=deck.name, card_count=counts[deck.id],
+        colors=[color for color in MANA_COLORS if color in colors_by_deck[deck.id]],
+        colors_known=known[deck.id],
+    ) for deck in decks]
 
 
 def fingerprint(token: str) -> str:
@@ -170,12 +214,18 @@ def delete_account(data: AccountDeletion, session: CurrentSession, db: Db):
     return Response(status_code=204)
 
 
-@app.get("/api/decks")
-def decks(session: CurrentSession):
-    # NI-01 only establishes the protected destination. Deck CRUD is a later story.
-    return []
+@app.get("/api/decks", response_model=DeckListOut)
+def decks(session: CurrentSession, db: Db, catalog: Catalog):
+    owned = list(db.scalars(select(Deck).where(Deck.user_id == session.user_id).order_by(Deck.id.desc())))
+    result = summarize_decks(db, owned, catalog)
+    return DeckListOut(count=len(result), decks=result)
 
 
-@app.get("/api/decks/{deck_id}")
-def deck(deck_id: str, session: CurrentSession):
-    raise HTTPException(404, "Kaladė nerasta.")
+@app.get("/api/decks/{deck_id}", response_model=DeckOut)
+def deck(deck_id: str, session: CurrentSession, db: Db, catalog: Catalog):
+    if not deck_id.isascii() or not deck_id.isdigit() or len(deck_id) > 10 or not 0 < int(deck_id) <= 2_147_483_647:
+        raise HTTPException(404, "Kaladė nerasta.")
+    owned = db.scalar(select(Deck).where(Deck.id == int(deck_id), Deck.user_id == session.user_id))
+    if owned is None:
+        raise HTTPException(404, "Kaladė nerasta.")
+    return summarize_decks(db, [owned], catalog)[0]

@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -21,10 +21,21 @@ class AuthSession(Base):
 
 
 class Deck(Base):
-    """Ownership needed for NI-02; deck editing is implemented in a later story."""
-
     __tablename__ = "decks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(255))
+
+
+class DeckCard(Base):
+    __tablename__ = "deck_cards"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_deck_cards_quantity"),
+        CheckConstraint("list_name IN ('main', 'maybeboard')", name="ck_deck_cards_list_name"),
+    )
+
+    deck_id: Mapped[int] = mapped_column(ForeignKey("decks.id", ondelete="CASCADE"), primary_key=True)
+    oracle_id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True)
+    list_name: Mapped[str] = mapped_column(String(16), primary_key=True, default="main")
+    quantity: Mapped[int] = mapped_column(Integer)
