@@ -15,7 +15,7 @@ async function createWithImport(page: Page) {
   await dialog.getByLabel('Kortų sąrašas (nebūtinas)', { exact: true }).fill(`UnknownNoticeCard-${Date.now()}`)
   await dialog.getByRole('button', { name: 'Sukurti', exact: true }).click()
   await expect(page).toHaveURL(/\/kalades\/\d+$/)
-  await page.getByRole('dialog', { name: 'Importo rezultatas', exact: true }).getByRole('button', { name: 'Praleisti', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Importo rezultatas', exact: true }).getByRole('button', { name: 'Uždaryti', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Importuotų kortų: 0.')
 }
 

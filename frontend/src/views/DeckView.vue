@@ -54,7 +54,7 @@ onMounted(load)
       <button class="button" @click="load">Bandyti dar kartą</button>
     </div>
     <template v-else-if="deck">
-      <ImportResultDialog v-if="report && (report.unrecognized_lines.length || report.skipped_main)" :deck-id="deck.id" :result="report" @close="report = null" @updated="imported" />
+      <ImportResultDialog v-if="report && (report.unrecognized_lines.length || report.skipped_main)" :deck-id="deck.id" :deck-name="deck.name" :result="report" @close="report = null" @updated="imported" />
       <DeckSettingsDialog v-if="settingsOpen" :deck="deck" @close="settingsOpen = false" @saved="settingsSaved" />
       <div class="decks-heading">
         <h1>{{ deck.name }}</h1>

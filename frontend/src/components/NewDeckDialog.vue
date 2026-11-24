@@ -83,7 +83,7 @@ async function create() {
       </div>
       <div class="field">
         <label for="deck-card-list">Kortų sąrašas (nebūtinas)</label>
-        <p id="deck-list-help" class="field-help">Viena korta eilutėje, pvz., „4 Lightning Bolt“. Svarstomas kortas rašykite po eilute „Svarstomos“.</p>
+        <p id="deck-list-help" class="field-help">Viena korta eilutėje, pvz., „4 Lightning Bolt“. Leidimo kodas ir kolekcinis numeris, pvz., „1 Sol Ring (C21) 263“, nebūtini. Svarstomas kortas rašykite po eilute „Svarstomos“.</p>
         <textarea id="deck-card-list" v-model="cardList" rows="8" :disabled="busy" :aria-invalid="Boolean(listError)"
           :aria-describedby="listError ? 'deck-list-error deck-list-help' : 'deck-list-help'" placeholder="4 Lightning Bolt&#10;&#10;Svarstomos&#10;1 Sol Ring"></textarea>
         <p v-if="listError" id="deck-list-error" class="field-error" role="alert">{{ listError }}</p>

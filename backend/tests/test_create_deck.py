@@ -161,3 +161,19 @@ def test_name_normalization_and_double_face_alias_contract():
     assert card_name_keys("Fable of the Mirror-Breaker // Reflection of Kiki") == [
         "fable of the mirror-breaker", "fable of the mirror-breaker // reflection of kiki",
     ]
+
+
+def test_printing_suffix_is_accepted_during_creation_and_settings_import(account):
+    http, factory, headers, _ = account
+    response = http.post("/api/decks", headers=headers, json={"card_list": "2 Lightning Bolt (M10) 146\n1x LIGHTNING BOLT (A25) 141"})
+    assert response.status_code == 201
+    deck = response.json()["deck"]
+    assert deck["card_count"] == 3
+    assert response.json()["import_result"]["unrecognized_lines"] == []
+    updated = http.put(f"/api/decks/{deck['id']}", headers=headers, json={"name": "Printing import", "card_list": "Lightning Bolt (M10) 146\nMaybeboard\n2 Lightning Bolt (A25) 141"})
+    assert updated.status_code == 200
+    assert updated.json()["deck"]["card_count"] == 4
+    assert updated.json()["import_result"]["imported"] == 3
+    with factory() as db:
+        assert db.get(DeckCard, (deck["id"], BOLT, "main")).quantity == 4
+        assert db.get(DeckCard, (deck["id"], BOLT, "maybeboard")).quantity == 2

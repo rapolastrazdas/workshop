@@ -72,7 +72,7 @@ test('rename with unknown import opens the existing import result dialog', async
   await expect(dialog).toHaveCount(0)
   const report = page.getByRole('dialog', { name: 'Importo rezultatas', exact: true })
   await expect(report).toBeVisible()
-  await report.getByRole('button', { name: 'Praleisti', exact: true }).click()
+  await report.getByRole('button', { name: 'Uždaryti', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Importo nustatymai', exact: true })).toBeVisible()
   await expect(page.getByText('Kortų: 0', { exact: true })).toBeVisible()
 })

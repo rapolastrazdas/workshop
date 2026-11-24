@@ -4,7 +4,7 @@ import { api, ApiError, auth } from '../auth'
 import type { DeckWrite, ImportResult } from '../decks'
 import { showNotice } from '../notices'
 
-const props = defineProps<{ deckId: number; result: ImportResult }>()
+const props = defineProps<{ deckId: number; deckName: string; result: ImportResult }>()
 const emit = defineEmits<{ close: []; updated: [result: DeckWrite] }>()
 const dialog = ref<HTMLDialogElement>()
 const corrected = ref('')
@@ -52,21 +52,24 @@ async function retry() {
 </script>
 
 <template>
-  <dialog ref="dialog" class="modal-dialog" aria-labelledby="import-title" @cancel="close">
+  <dialog ref="dialog" class="modal-dialog import-result-dialog" aria-labelledby="import-title" @cancel="close">
     <div class="dialog-header">
       <h2 id="import-title">Importo rezultatas</h2>
-      <button class="dialog-close" type="button" aria-label="Uždaryti" :disabled="busy" @click="close()">×</button>
+      <button class="dialog-close" type="button" aria-label="Uždaryti langą" :disabled="busy" @click="close()">×</button>
     </div>
+    <p v-if="result.imported > 0">Atpažintos kortos jau įrašytos į kaladę „{{ deckName }}“.</p>
+    <p v-else>Šiuo bandymu į kaladę „{{ deckName }}“ kortų neimportuota.</p>
     <p v-if="result.skipped_main" role="status">Viršyta 500 pagrindinių kortų riba. Neimportuotų kortų: {{ result.skipped_main }}.</p>
     <form :aria-busy="busy" @submit.prevent="retry">
       <div v-if="result.unrecognized_lines.length" class="field">
         <p id="import-help">Neatpažintų eilučių: {{ result.unrecognized_lines.length }}. Pataisykite jas arba praleiskite.</p>
         <label for="corrected-lines">Neatpažintos eilutės</label>
-        <textarea id="corrected-lines" v-model="corrected" rows="6" aria-describedby="import-help" :disabled="busy"></textarea>
+        <textarea id="corrected-lines" v-model="corrected" rows="5" aria-describedby="import-help corrected-lines-help" :disabled="busy"></textarea>
+        <p id="corrected-lines-help" class="field-help">Viena korta eilutėje: kiekis ir pavadinimas.</p>
       </div>
       <p v-if="message" class="error-banner" role="alert">{{ message }}</p>
       <div class="dialog-actions">
-        <button class="button" type="button" :disabled="busy" @click="close()">Praleisti</button>
+        <button class="button" type="button" :disabled="busy" @click="close()">Uždaryti</button>
         <button v-if="result.unrecognized_lines.length" class="button button-primary" type="submit" :disabled="busy || !corrected.trim()">{{ busy ? 'Importuojama…' : 'Importuoti pataisytas' }}</button>
       </div>
     </form>

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from .models import DeckCard
 
 MAIN_CARD_LIMIT = 500
+PRINTING_SUFFIX = re.compile(r"\s+\([A-Za-z0-9]{2,8}\)(?:\s+[0-9][A-Za-z0-9★†/.\-]*)?$")
 
 
 def normalize_card_name(name: str) -> str:
@@ -63,6 +64,10 @@ def parse_card_list(card_list: str) -> tuple[list[ImportLine], list[Unrecognized
                 continue
             quantity = int(amount)
         elif re.match(r"^[+-]?[0-9]+(?:[xX]|\.[0-9]+)?\s", line):
+            unrecognized.append(UnrecognizedLine(text=line, list_name=list_name))
+            continue
+        name = PRINTING_SUFFIX.sub("", name).strip()
+        if not name:
             unrecognized.append(UnrecognizedLine(text=line, list_name=list_name))
             continue
         lines.append(ImportLine(line, normalize_card_name(name), quantity, list_name))
