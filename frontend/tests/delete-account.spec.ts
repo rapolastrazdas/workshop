@@ -32,7 +32,7 @@ test('deletion confirms password, handles errors, removes account and signs out'
   await dialog.getByRole('button', { name: 'Šalinti paskyrą', exact: true }).click()
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await expect(page.getByRole('alert')).toHaveText('Paskyra ištrinta.')
+  await expect(page.getByRole('alert')).toContainText('Paskyra ištrinta.')
   await expect(page.getByRole('link', { name: 'Prisijungti', exact: true })).toBeVisible()
   expect(await page.evaluate(() => sessionStorage.getItem('workshop.session'))).toBeNull()
   for (const token of [oldToken, secondToken]) {
@@ -42,6 +42,7 @@ test('deletion confirms password, handles errors, removes account and signs out'
   expect(login.status()).toBe(401)
   await page.goto('/mano-kalades')
   await expect(page).toHaveURL(/\/prisijungimas$/)
+  await expect(page.getByText('Paskyra ištrinta.', { exact: true })).toHaveCount(0)
 })
 
 test('cancel, close button and Escape keep account and clear password', async ({ page }) => {

@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, ApiError, auth, clearSession } from '../auth'
 import { router } from '../router'
+import { showNotice } from '../notices'
 
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement>()
@@ -47,7 +48,7 @@ async function removeAccount() {
     await api('/auth/account', { method: 'DELETE', body: JSON.stringify({ password: password.value }) })
     password.value = ''
     clearSession()
-    auth.notice = 'Paskyra ištrinta.'
+    showNotice('Paskyra ištrinta.', '/')
     emit('close')
     await router.replace({ name: 'home' })
   } catch (error) {

@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, ApiError, auth } from '../auth'
 import type { DeckWrite, ImportResult } from '../decks'
+import { showNotice } from '../notices'
 
 const props = defineProps<{ deckId: number; result: ImportResult }>()
 const emit = defineEmits<{ close: []; updated: [result: DeckWrite] }>()
@@ -38,7 +39,7 @@ async function retry() {
     const result = await api<DeckWrite>(`/decks/${props.deckId}/import`, {
       method: 'POST', body: JSON.stringify({ card_list: corrected.value }),
     })
-    auth.notice = `Importuotų kortų: ${result.import_result?.imported ?? 0}.`
+    showNotice(`Importuotų kortų: ${result.import_result?.imported ?? 0}.`)
     emit('updated', result)
   } catch (error) {
     if (!(error instanceof ApiError && error.status === 401)) {

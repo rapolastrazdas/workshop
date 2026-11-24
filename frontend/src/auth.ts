@@ -1,4 +1,5 @@
 import { reactive } from 'vue'
+import { dismissNotice, showNotice } from './notices'
 
 type User = { id: number; email: string }
 type Session = { access_token: string; expires_at: number; user: User }
@@ -19,10 +20,10 @@ function readSession(): Session | null {
 
 export const auth = reactive({
   session: readSession() as Session | null,
-  notice: '',
 })
 
 export function clearSession() {
+  dismissNotice()
   clearTimeout(timer)
   auth.session = null
   sessionStorage.removeItem(STORAGE_KEY)
@@ -31,7 +32,7 @@ export function clearSession() {
 export function expireSession() {
   if (!auth.session) return
   clearSession()
-  auth.notice = EXPIRED_MESSAGE
+  showNotice(EXPIRED_MESSAGE, '/prisijungimas')
   window.dispatchEvent(new Event('workshop:session-expired'))
 }
 
@@ -45,7 +46,7 @@ export function scheduleExpiry() {
 
 export function saveSession(session: Session) {
   auth.session = session
-  auth.notice = ''
+  dismissNotice()
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))
   scheduleExpiry()
 }

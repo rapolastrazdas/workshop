@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, ApiError, auth } from '../auth'
 import { rememberImport, type DeckWrite } from '../decks'
 import { router } from '../router'
+import { showNotice } from '../notices'
 
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement>()
@@ -47,7 +48,7 @@ async function create() {
   try {
     const result = await api<DeckWrite>('/decks', { method: 'POST', body: JSON.stringify({ name: name.value, card_list: cardList.value }) })
     rememberImport(result.deck.id, result.import_result)
-    auth.notice = result.import_result ? `Importuotų kortų: ${result.import_result.imported}.` : ''
+    showNotice(result.import_result ? `Importuotų kortų: ${result.import_result.imported}.` : '', `/kalades/${result.deck.id}`)
     emit('close')
     await router.push({ name: 'deck', params: { id: result.deck.id } })
   } catch (error) {

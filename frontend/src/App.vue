@@ -4,23 +4,23 @@ import { RouterLink, RouterView } from 'vue-router'
 import { api, ApiError, auth, clearSession } from './auth'
 import { router } from './router'
 import DeleteAccountDialog from './components/DeleteAccountDialog.vue'
+import { dismissNotice, notice, showNotice } from './notices'
 
 const loggingOut = ref(false)
-const logoutError = ref('')
 const deletingAccount = ref(false)
 
 async function logout() {
   if (loggingOut.value) return
   loggingOut.value = true
-  logoutError.value = ''
+  dismissNotice()
   try {
     await api('/auth/logout', { method: 'POST' })
     clearSession()
-    auth.notice = ''
     await router.replace({ name: 'home' })
   } catch (error) {
     if (!(error instanceof ApiError && error.status === 401)) {
-      logoutError.value = error instanceof Error ? error.message : 'Nepavyko atsijungti. Bandykite dar kartą.'
+      showNotice(error instanceof Error ? error.message : 'Nepavyko atsijungti. Bandykite dar kartą.',
+        router.currentRoute.value.path, 'error')
     }
   } finally {
     loggingOut.value = false
@@ -45,9 +45,11 @@ async function logout() {
       </nav>
     </header>
     <DeleteAccountDialog v-if="deletingAccount && auth.session" @close="deletingAccount = false" />
-    <div v-if="logoutError" class="global-notice error-banner" role="alert">{{ logoutError }}</div>
     <main id="main-content">
-      <div v-if="auth.notice" class="global-notice info-banner" role="alert">{{ auth.notice }}</div>
+      <div v-if="notice.message" class="global-notice notice-banner" :class="notice.kind === 'error' ? 'error-banner' : 'info-banner'" role="alert">
+        <span>{{ notice.message }}</span>
+        <button class="dialog-close" type="button" aria-label="Uždaryti pranešimą" @click="dismissNotice">×</button>
+      </div>
       <RouterView :key="$route.path" />
     </main>
     <footer class="site-footer">
