@@ -1,104 +1,58 @@
-# Urza's Workshop
+﻿# Urza's Workshop
 
-Vietinė MTG kaladžių kūrimo sistema. NI-01: registracija, prisijungimas ir
-atsijungimas. Sąsaja – Vue 3 ir TypeScript, serveris – Python ir FastAPI,
-duomenų bazė – PostgreSQL. Qdrant ir DI bus pridėti vėlesnėse istorijose.
+MTG kortų kaladžių kūrimo sistema. Šiuo metu veikia registracija,
+prisijungimas ir atsijungimas. Kaladžių tvarkymas ir kortų paieška bus pridėti vėliau.
 
 ## Paleidimas su Docker
 
-Reikia veikiančio „Docker Desktop“ su WSL 2. Pirmą kartą reikės interneto
-atvaizdams ir priklausomybėms atsisiųsti.
+- Git projektui atsisiųsti.
+- Paleisto Docker Desktop (Windows sistemoje – su WSL 2).
+- Interneto pirmam paleidimui.
 
-1. Pasirinktinai nukopijuokite `.env.example` į `.env` ir pakeiskite nustatymus.
-2. Paleiskite `paleisti.bat` arba repozitorijos aplanke vykdykite:
+Atsisiųskite repozitoriją ir jos aplanke paleiskite `paleisti.bat`
+(Windows) arba terminale vykdykite:
 
-```powershell
+```sh
 docker compose up --build -d --wait
 ```
 
-3. Naršyklėje atidarykite **http://localhost:8080**.
+Duomenų bazė ir jos lentelės paruošiamos automatiškai.
 
-Sustabdyti: `sustabdyti.bat` arba `docker compose stop`.
-PostgreSQL duomenys lieka vardiniame `postgres_data` tome sustabdžius ar
-perkūrus konteinerius. `docker compose down -v` ištrina duomenis.
-DB ir API prievadai kompiuterio tinkle neviešinami. Sąsaja pasiekiama tik
-šiame kompiuteryje. `APP_PORT` leidžia pakeisti 8080 prievadą.
+Naršyklėje atidarykite **http://localhost:8080**.
 
-Naudojimui iš kito įrenginio reikės prieigos prie to paties serverio per
-HTTPS. Dabartinis paleidimas skirtas `localhost`.
+Norėdami sustabdyti, paleiskite `sustabdyti.bat` (Windows) arba vykdykite:
 
-## Paleidimas be Docker kūrimui
+```sh
+docker compose stop
+```
 
-Reikia Python 3.13 ir Node.js 24. SQLite yra vietinio kūrimo ir testavimo
-alternatyva. Docker aplinka naudoja PostgreSQL.
+Sustabdžius programą, duomenys išlieka.
 
-Repozitorijos aplanke vieną kartą:
+## Testai
+
+Testams papildomai reikia Python 3.13 ir Node.js 24.
+Toliau pateiktos komandos skirtos Windows PowerShell.
+
+Serverio testai (pradėkite repozitorijos aplanke):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt
-cd frontend
-npm.cmd ci
-cd ..
-```
-
-Pirmame terminale:
-
-```powershell
 cd backend
-..\.venv\Scripts\python.exe -m alembic upgrade head
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
-```
-
-Antrame terminale:
-
-```powershell
-cd frontend
-npm.cmd run dev
-```
-
-Atidarykite **http://127.0.0.1:5173**. Duomenys lieka `backend/workshop.db`.
-Vite persiunčia `/api` į FastAPI; naršyklei tai ta pati kilmė.
-Vietinei PostgreSQL prieš migraciją ir serverio paleidimą nustatykite
-`DATABASE_URL=postgresql+psycopg://naudotojas:slaptazodis@localhost:5432/workshop`
-pagal savo DB nustatymus. `.env` automatiškai skaito Docker Compose;
-tiesiogiai paleidžiamam Python kintamuosius nustatykite terminale.
-
-## Patikros
-
-Serverio testai iš `backend`:
-
-```powershell
 ..\.venv\Scripts\python.exe -m pytest -q
 ```
 
-TypeScript patikra ir sąsajos surinkimas iš `frontend`:
+Šie testai naudoja atskirą laikiną SQLite bazę ir nereikalauja paleistos programos.
+
+Naršyklės testams pirmiausia paleiskite programą su Docker.
+Naujame terminale, repozitorijos aplanke:
 
 ```powershell
-npm.cmd run build
-```
-
-Naršyklės testams reikia veikiančių serverio ir sąsajos. Testai sukuria
-paskyrų atsitiktiniais adresais, todėl naudokite atskirą kūrimo DB.
-Iš `frontend`:
-
-```powershell
+cd frontend
+npm.cmd ci
 npx.cmd playwright install chromium
+$env:BASE_URL='http://localhost:8080'
 npm.cmd run test:e2e
 ```
 
-Galima naudoti įdiegtą Edge: `$env:PLAYWRIGHT_CHANNEL='msedge'`.
-Kitam sąsajos adresui: `$env:BASE_URL='http://localhost:8080'`.
-
-## NI-01 apimtis
-
-Formos, atsijungimas, 60 min. sesija, apsaugoti kaladžių adresai ir
-„Mano kaladės“ ruošinys. Pagrindiniame puslapyje kol kas yra tik antraštė
-ir poraštė. „Šalinti paskyrą“ mygtukas išjungtas iki NI-02.
-Kortų paieška ir kaladžių tvarkymas dar neįgyvendinti.
-
-API ir sprendimai: [docs/NI-01.md](docs/NI-01.md).
-
-Paleidimo tvarka remiasi [Docker Compose sveikatos patikromis](https://docs.docker.com/compose/how-tos/startup-order/),
-maršrutų apsauga – [Vue Router navigacijos sargais](https://router.vuejs.org/guide/advanced/navigation-guards.html),
-slaptažodžių maišos – [FastAPI autentifikacijos gairėmis](https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/).
+Testai sukuria testines paskyras veikiančioje duomenų bazėje.
