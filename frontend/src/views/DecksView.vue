@@ -4,10 +4,12 @@ import { RouterLink } from 'vue-router'
 import { api, ApiError } from '../auth'
 import { deckCountLabel, type DeckList } from '../decks'
 import DeckColors from '../components/DeckColors.vue'
+import NewDeckDialog from '../components/NewDeckDialog.vue'
 
 const data = ref<DeckList | null>(null)
 const loading = ref(true)
 const error = ref('')
+const creating = ref(false)
 
 async function load() {
   loading.value = true
@@ -33,8 +35,9 @@ onMounted(load)
         <h1 id="decks-title">Mano kaladės</h1>
         <span v-if="data && !loading && !error" class="muted" data-testid="deck-count">{{ deckCountLabel(data.count) }}</span>
       </div>
-      <button class="button button-primary" disabled title="Kaladžių kūrimas dar nepasiekiamas.">+ Nauja kaladė</button>
+      <button class="button button-primary" @click="creating = true">+ Nauja kaladė</button>
     </div>
+    <NewDeckDialog v-if="creating" @close="creating = false" />
     <p v-if="loading" class="muted" role="status">Kraunamos kaladės…</p>
     <div v-else-if="error" class="load-error">
       <p class="error-banner" role="alert">{{ error }}</p>

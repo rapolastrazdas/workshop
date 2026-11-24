@@ -25,14 +25,14 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .button-danger { border-color: #fecaca; color: #b91c1c; }
 .button-destructive { background: #b91c1c; border-color: #b91c1c; color: #fff; }
 .button-destructive:hover:not(:disabled) { background: #991b1b; border-color: #991b1b; }
-.account-dialog { width: 600px; max-width: calc(100% - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1f2937; }
-.account-dialog::backdrop { background: rgb(15 23 42 / 40%); }
+.modal-dialog { width: 600px; max-width: calc(100% - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1f2937; }
+.modal-dialog::backdrop { background: rgb(15 23 42 / 40%); }
 .dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
-.account-dialog h2 { font-size: 22px; margin: 0; }
+.modal-dialog h2 { font-size: 22px; margin: 0; }
 .dialog-close { display: inline-flex; justify-content: center; align-items: center; width: 32px; height: 32px; padding: 0; flex-shrink: 0; border: 0; border-radius: 4px; background: transparent; color: #475569; font-size: 24px; cursor: pointer; }
 .dialog-close:hover:not(:disabled) { background: #f1f5f9; }
 .dialog-close:disabled { cursor: not-allowed; opacity: .55; }
-.account-dialog > p { margin: 0 0 24px; color: #475569; }
+.modal-dialog > p { margin: 0 0 24px; color: #475569; }
 .dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
 main { flex: 1; display: flex; flex-direction: column; }
 .auth-area { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 64px 24px; }
@@ -43,6 +43,9 @@ main { flex: 1; display: flex; flex-direction: column; }
 .field input { width: 100%; height: 44px; padding: 10px 12px; background: #fff; color: #1f2937; font-size: 16px; border: 1px solid #94a3b8; border-radius: 5px; }
 .field input[aria-invalid="true"] { border-color: #dc2626; }
 .field input::placeholder { color: #64748b; }
+.field textarea { display: block; width: 100%; resize: vertical; min-height: 120px; padding: 10px 12px; font: inherit; font-size: 16px; color: #1f2937; border: 1px solid #94a3b8; border-radius: 5px; }
+.field textarea[aria-invalid="true"] { border-color: #dc2626; }
+.field-help { margin: 6px 0; color: #64748b; font-size: 14px; line-height: 1.4; }
 .field-error { color: #b91c1c; font-size: 14px; line-height: 20px; margin: 6px 0 0; }
 .submit-button { width: 100%; min-height: 44px; }
 .error-banner { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 6px; padding: 12px; margin: 0 0 20px; font-size: 14px; line-height: 22px; display: flex; align-items: center; gap: 10px; }

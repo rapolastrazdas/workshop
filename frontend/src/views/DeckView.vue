@@ -2,14 +2,21 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { api, ApiError } from '../auth'
-import type { DeckSummary } from '../decks'
+import { consumeImport, type DeckSummary, type DeckWrite, type ImportResult } from '../decks'
 import DeckColors from '../components/DeckColors.vue'
+import ImportResultDialog from '../components/ImportResultDialog.vue'
 
 const route = useRoute()
 const deck = ref<DeckSummary | null>(null)
 const loading = ref(true)
 const error = ref('')
 const notFound = ref(false)
+const report = ref<ImportResult | null>(consumeImport(Number(route.params.id)))
+
+function imported(result: DeckWrite) {
+  deck.value = result.deck
+  report.value = result.import_result
+}
 
 async function load() {
   loading.value = true
@@ -40,6 +47,7 @@ onMounted(load)
       <button class="button" @click="load">Bandyti dar kartą</button>
     </div>
     <template v-else-if="deck">
+      <ImportResultDialog v-if="report && (report.unrecognized_lines.length || report.skipped_main)" :deck-id="deck.id" :result="report" @close="report = null" @updated="imported" />
       <h1>{{ deck.name }}</h1>
       <p class="muted">Kortų: {{ deck.card_count }}</p>
       <DeckColors :colors="deck.colors" :known="deck.colors_known" :card-count="deck.card_count" />
