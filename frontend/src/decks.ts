@@ -10,6 +10,18 @@ export type DeckSummary = {
 
 export type DeckList = { count: number; decks: DeckSummary[] }
 
+export type DeckCard = {
+  oracle_id: string
+  list_name: 'main' | 'maybeboard'
+  quantity: number
+  name: string | null
+  mana_cost: string | null
+  mana_value: number | null
+  is_land: boolean
+}
+
+export type DeckDetail = DeckSummary & { cards: DeckCard[] }
+
 export type ImportResult = {
   imported: number
   unrecognized_lines: { text: string; list_name: 'main' | 'maybeboard' }[]

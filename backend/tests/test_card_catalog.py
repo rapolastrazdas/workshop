@@ -44,6 +44,20 @@ def test_missing_collection_and_missing_metadata_are_unknown(monkeypatch):
     assert catalog.colors_for(set()) == {}
 
 
+def test_catalog_reads_legacy_collection_until_current_alias_exists(monkeypatch):
+    card_id = str(UUID(int=1))
+
+    def handler(request):
+        if request.url.path == "/collections/cards__current/points":
+            return httpx.Response(404)
+        assert request.url.path == "/collections/cards/points"
+        return httpx.Response(200, json={"result": [{"id": card_id, "payload": {"colors": ["U"]}}]})
+
+    mock_catalog(monkeypatch, handler)
+    reader = CardCatalog(base_url="http://catalog.local", collection="cards__current", fallback_collection="cards")
+    assert reader.colors_for({card_id}) == {card_id: ["U"]}
+
+
 def test_full_card_name_takes_priority_over_front_face_alias(monkeypatch):
     original, other = str(UUID(int=1)), str(UUID(int=2))
     catalog = mock_catalog(monkeypatch, lambda _: httpx.Response(200, json={"result": {

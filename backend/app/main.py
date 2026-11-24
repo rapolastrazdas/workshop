@@ -1,8 +1,9 @@
 import hashlib
+import math
 import os
 import secrets
 import time
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -73,6 +74,20 @@ class DeckListOut(BaseModel):
     decks: list[DeckOut]
 
 
+class DeckCardOut(BaseModel):
+    oracle_id: str
+    list_name: Literal["main", "maybeboard"]
+    quantity: int
+    name: str | None
+    mana_cost: str | None
+    mana_value: float | None
+    is_land: bool
+
+
+class DeckDetailOut(DeckOut):
+    cards: list[DeckCardOut]
+
+
 class DeckCreate(BaseModel):
     name: str = ""
     card_list: str = ""
@@ -110,6 +125,10 @@ def summarize_decks(db: Session, decks: list[Deck], catalog: CardCatalog) -> lis
         colors_by_card = catalog.colors_for(oracle_ids) if oracle_ids else {}
     except CardCatalogUnavailable:
         raise HTTPException(503, "Nepavyko gauti kortų duomenų. Bandykite dar kartą.") from None
+    return deck_summaries(decks, main_cards, colors_by_card)
+
+
+def deck_summaries(decks: list[Deck], main_cards: list[DeckCard], colors_by_card: dict[str, list[str]]) -> list[DeckOut]:
     counts = {deck.id: 0 for deck in decks}
     colors_by_deck: dict[int, set[str]] = {deck.id: set() for deck in decks}
     known = {deck.id: True for deck in decks}
@@ -330,9 +349,41 @@ def delete_deck(deck_id: str, data: DeckDeletion, session: CurrentSession, db: D
     return Response(status_code=204)
 
 
-@app.get("/api/decks/{deck_id}", response_model=DeckOut)
+@app.get("/api/decks/{deck_id}", response_model=DeckDetailOut)
 def deck(deck_id: str, session: CurrentSession, db: Db, catalog: Catalog):
     owned = db.scalar(select(Deck).where(Deck.id == parse_deck_id(deck_id), Deck.user_id == session.user_id))
     if owned is None:
         raise HTTPException(404, "Kaladė nerasta.")
-    return summarize_decks(db, [owned], catalog)[0]
+    cards = list(db.scalars(select(DeckCard).where(DeckCard.deck_id == owned.id)
+                            .order_by(DeckCard.list_name, DeckCard.oracle_id)))
+    try:
+        payloads = catalog.payloads_for(
+            {card.oracle_id for card in cards},
+            ["name", "mana_cost", "cmc", "mana_value", "type_line", "colors", "card_faces"],
+        ) if cards else {}
+    except CardCatalogUnavailable:
+        raise HTTPException(503, "Nepavyko gauti kortų duomenų. Bandykite dar kartą.") from None
+
+    summary = deck_summaries(
+        [owned], [card for card in cards if card.list_name == "main"], CardCatalog.colors_from(payloads),
+    )[0]
+    details = []
+    for card in cards:
+        payload = payloads.get(card.oracle_id, {})
+        name = payload.get("name")
+        mana_cost = payload.get("mana_cost")
+        faces = payload.get("card_faces") or []
+        if not mana_cost and faces:
+            mana_cost = faces[0].get("mana_cost")
+        mana_value = payload.get("mana_value", payload.get("cmc"))
+        type_line = payload.get("type_line")
+        # Use the front face's card types, without subtypes such as Land in a name.
+        front_types = type_line.split("//", 1)[0].split("—", 1)[0].split() if isinstance(type_line, str) else []
+        details.append(DeckCardOut(
+            oracle_id=card.oracle_id, list_name=card.list_name, quantity=card.quantity,
+            name=name if isinstance(name, str) and name.strip() else None,
+            mana_cost=mana_cost if isinstance(mana_cost, str) else None,
+            mana_value=mana_value if type(mana_value) in (int, float) and math.isfinite(mana_value) and mana_value >= 0 else None,
+            is_land="Land" in front_types,
+        ))
+    return DeckDetailOut(**summary.model_dump(), cards=details)

@@ -1,19 +1,42 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { api, ApiError } from '../auth'
-import { consumeImport, type DeckSummary, type DeckWrite, type ImportResult } from '../decks'
+import { consumeImport, type DeckCard, type DeckDetail, type DeckWrite, type ImportResult } from '../decks'
 import DeckColors from '../components/DeckColors.vue'
 import ImportResultDialog from '../components/ImportResultDialog.vue'
 import DeckSettingsDialog from '../components/DeckSettingsDialog.vue'
 
 const route = useRoute()
-const deck = ref<DeckSummary | null>(null)
+const deck = ref<DeckDetail | null>(null)
 const loading = ref(true)
 const error = ref('')
 const notFound = ref(false)
-const report = ref<ImportResult | null>(consumeImport(Number(route.params.id)))
+const report = ref<ImportResult | null>(null)
 const settingsOpen = ref(false)
+let latestRequest = 0
+
+const cards = computed(() => [...(deck.value?.cards ?? [])].sort(
+  (left, right) => (left.name ?? '').localeCompare(right.name ?? '', 'lt') ||
+    left.oracle_id.localeCompare(right.oracle_id),
+))
+const maybeboard = computed(() => cards.value.filter(card => card.list_name === 'maybeboard'))
+const maybeboardCount = computed(() => maybeboard.value.reduce((sum, card) => sum + card.quantity, 0))
+const mainGroups = computed(() => {
+  const labels = ['0', '1', '2', '3', '4', '5', '6+', 'Žemės', 'Nežinoma manos vertė']
+  const groups = labels.map(label => ({ label, count: 0, cards: [] as DeckCard[] }))
+  for (const card of cards.value) {
+    if (card.list_name !== 'main') continue
+    const index = card.is_land ? 7 : card.mana_value == null ? 8 : Math.min(6, Math.floor(card.mana_value))
+    groups[index].cards.push(card)
+    groups[index].count += card.quantity
+  }
+  return groups.filter(group => group.count > 0)
+})
+const cardGroups = computed(() => [
+  ...mainGroups.value.map(group => ({ ...group, heading: 'h3' })),
+  { label: 'Svarstomos kortos', heading: 'h2', count: maybeboardCount.value, cards: maybeboard.value },
+])
 
 function settingsSaved(result: DeckWrite) {
   settingsOpen.value = false
@@ -21,35 +44,49 @@ function settingsSaved(result: DeckWrite) {
 }
 
 function imported(result: DeckWrite) {
-  deck.value = result.deck
+  if (deck.value?.id !== result.deck.id) return
+  deck.value = { ...deck.value, ...result.deck }
   report.value = result.import_result
+  void load()
 }
 
 async function load() {
+  const request = ++latestRequest
   loading.value = true
   error.value = ''
   notFound.value = false
   try {
-    deck.value = await api<DeckSummary>(`/decks/${encodeURIComponent(String(route.params.id))}`)
+    const result = await api<DeckDetail>(`/decks/${encodeURIComponent(String(route.params.id))}`)
+    if (request === latestRequest) deck.value = result
   } catch (cause) {
-    if (cause instanceof ApiError && cause.status === 404) notFound.value = true
+    if (request !== latestRequest) return
+    if (cause instanceof ApiError && cause.status === 404) {
+      deck.value = null
+      notFound.value = true
+    }
     else if (!(cause instanceof ApiError && cause.status === 401)) {
       error.value = cause instanceof Error ? cause.message : 'Nepavyko atidaryti kaladės. Bandykite dar kartą.'
     }
   } finally {
-    loading.value = false
+    if (request === latestRequest) loading.value = false
   }
 }
 
-onMounted(load)
+watch(() => route.params.id, (id) => {
+  if (typeof id !== 'string') return
+  deck.value = null
+  report.value = consumeImport(Number(id))
+  settingsOpen.value = false
+  void load()
+}, { immediate: true })
 </script>
 
 <template>
   <section class="content-area" :aria-busy="loading" aria-label="Kaladės redaktorius">
     <RouterLink class="back-link" to="/mano-kalades">Mano kaladės</RouterLink>
-    <p v-if="loading" class="muted" role="status">Kraunama kaladė…</p>
+    <p v-if="loading && !deck" class="muted" role="status">Kraunama kaladė…</p>
     <h1 v-else-if="notFound">Kaladė nerasta</h1>
-    <div v-else-if="error" class="load-error">
+    <div v-else-if="error && !deck" class="load-error">
       <p class="error-banner" role="alert">{{ error }}</p>
       <button class="button" @click="load">Bandyti dar kartą</button>
     </div>
@@ -58,13 +95,26 @@ onMounted(load)
       <DeckSettingsDialog v-if="settingsOpen" :deck="deck" @close="settingsOpen = false" @saved="settingsSaved" />
       <div class="decks-heading">
         <h1>{{ deck.name }}</h1>
-        <button class="button" @click="settingsOpen = true">Nustatymai</button>
+        <button class="button" :disabled="loading" @click="settingsOpen = true">Nustatymai</button>
       </div>
       <p class="muted">Kortų: {{ deck.card_count }}</p>
       <DeckColors :colors="deck.colors" :known="deck.colors_known" :card-count="deck.card_count" />
-      <div class="editor-placeholder">
+      <p v-if="error" class="error-banner" role="alert">{{ error }} <button class="button" @click="load">Bandyti dar kartą</button></p>
+      <div class="deck-composition">
         <h2>Pagrindinės kortos</h2>
-        <p v-if="deck.card_count === 0" class="muted">Kaladėje dar nėra kortų.</p>
+        <p v-if="!loading && !error && cards.length === 0" class="muted">
+          Kaladėje dar nėra kortų. Ieškokite kortų arba importuokite kortų sąrašą.
+        </p>
+        <section v-for="group in cardGroups" :key="group.label" class="deck-card-group">
+          <component :is="group.heading">{{ group.label }} ({{ group.count }})</component>
+          <ul v-if="group.cards.length" class="deck-card-list">
+            <li v-for="card in group.cards" :key="card.oracle_id">
+              <span>{{ card.quantity }}×</span>
+              <span>{{ card.name ?? 'Nežinoma korta' }}</span>
+              <span class="deck-mana-cost">{{ card.mana_cost === null ? '—' : card.mana_cost }}</span>
+            </li>
+          </ul>
+        </section>
       </div>
     </template>
   </section>

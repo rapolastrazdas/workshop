@@ -159,9 +159,17 @@ def prune_old_versions(db: httpx.Client, alias: str, previous: str | None):
 
 
 def sync_catalog(source: httpx.Client, db: httpx.Client, alias: str,
-                 encoder: CardEncoder | None = None):
-    active = aliases(db).get(alias)
-    old_path = f"/collections/{quote(active, safe='')}" if active else None
+                 encoder: CardEncoder | None = None, *, legacy: str | None = None):
+    names = aliases(db)
+    active = names.get(alias)
+    previous = active
+    if not previous and legacy:
+        previous = names.get(legacy)
+        if not previous:
+            exists = request(db, "GET", f"/collections/{quote(legacy, safe='')}/exists")
+            if exists["exists"]:
+                previous = legacy
+    old_path = f"/collections/{quote(previous, safe='')}" if previous else None
     if old_path:
         metadata = request(db, "GET", old_path)["config"].get("metadata") or {}
     else:
@@ -183,6 +191,10 @@ def sync_catalog(source: httpx.Client, db: httpx.Client, alias: str,
     if saved_at:
         current, saved = timestamp(updated_at), timestamp(saved_at)
         if current < saved or (current == saved and version == old_version):
+            if not active and previous:
+                request(db, "POST", "/collections/aliases", json={"actions": [
+                    {"create_alias": {"collection_name": previous, "alias_name": alias}},
+                ]})
             LOG.info("Catalog unchanged: new=0 changed=0, Scryfall version %s", saved_at)
             return
     else:
@@ -197,7 +209,7 @@ def sync_catalog(source: httpx.Client, db: httpx.Client, alias: str,
         "on_disk_payload": True,
         "metadata": {
             "scryfall_updated_at": updated_at, "model_version": version,
-            "previous_collection": active,
+            "previous_collection": previous,
         },
     })
     request(db, "PUT", f"{stage_path}/index", params={"wait": "true"},
@@ -235,7 +247,7 @@ def sync_catalog(source: httpx.Client, db: httpx.Client, alias: str,
     LOG.info("Catalog updated: new=%d changed=%d retained=%d, Scryfall version %s",
              added, changed, retained, updated_at)
     try:
-        prune_old_versions(db, alias, previous=active)
+        prune_old_versions(db, alias, previous=previous)
     except (httpx.HTTPError, ValueError, KeyError):
         LOG.exception("Could not clean up older catalog collections")
 
@@ -249,7 +261,7 @@ def run_once():
         fcntl.flock(lock, fcntl.LOCK_EX)
         with httpx.Client(headers=SCRYFALL_HEADERS, timeout=60, follow_redirects=True) as source:
             with httpx.Client(base_url=catalog.base_url, timeout=60, trust_env=False) as db:
-                sync_catalog(source, db, catalog.collection)
+                sync_catalog(source, db, catalog.collection, legacy=catalog.fallback_collection)
 
 
 def main() -> int:

@@ -19,6 +19,14 @@ class Catalog:
         self.requested.update(ids)
         return {key: value for key, value in self.colors.items() if key in ids}
 
+    def payloads_for(self, ids, fields):
+        details = {
+            WHITE: {"name": "Plains", "mana_cost": "", "cmc": 0, "type_line": "Basic Land — Plains"},
+            MULTI: {"name": "Multicolor card", "mana_cost": "{4}{U}{B}", "cmc": 6, "type_line": "Creature"},
+            RED: {"name": "Lightning Bolt", "mana_cost": "{R}", "cmc": 1, "type_line": "Instant"},
+        }
+        return {key: {"colors": colors, **details.get(key, {})} for key, colors in self.colors_for(ids).items()}
+
 
 def register(http, email):
     response = http.post("/api/auth/register", json={
@@ -96,6 +104,17 @@ def test_own_deck_opens_and_other_users_deck_is_indistinguishable_from_missing(d
     assert response.status_code == 200
     assert response.json()["name"] == "Main deck"
     assert response.json()["card_count"] == 7
+    assert response.json()["colors"] == ["W", "U", "B"]
+    cards = {(card["list_name"], card["oracle_id"]): card for card in response.json()["cards"]}
+    assert len(cards) == 5
+    assert cards["main", WHITE] == {
+        "oracle_id": WHITE, "list_name": "main", "quantity": 4, "name": "Plains",
+        "mana_cost": "", "mana_value": 0, "is_land": True,
+    }
+    assert cards["main", MULTI]["mana_cost"] == "{4}{U}{B}"
+    assert cards["main", MULTI]["mana_value"] == 6
+    assert cards["maybeboard", WHITE]["quantity"] == 20
+    assert cards["maybeboard", RED]["quantity"] == 99
     catalog.requested.clear()
     foreign = http.get(f"/api/decks/{ids[4]}", headers=headers)
     missing = http.get("/api/decks/2147483647", headers=headers)
@@ -120,6 +139,8 @@ def test_missing_metadata_does_not_claim_colorless(decks_data):
     assert response.status_code == 200
     assert response.json()["card_count"] == 7
     assert response.json()["colors_known"] is False
+    assert len(response.json()["cards"]) == 5
+    assert all(card["name"] is None and card["mana_value"] is None for card in response.json()["cards"])
 
 
 def test_catalog_failure_is_retryable_not_a_false_empty_list(decks_data):
