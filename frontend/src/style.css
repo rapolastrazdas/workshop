@@ -34,6 +34,8 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .dialog-close:disabled { cursor: not-allowed; opacity: .55; }
 .modal-dialog > p { margin: 0 0 24px; color: #475569; }
 .dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
+.deck-deletion-section { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+.deck-deletion-section h3 { margin: 0; font-size: 16px; }
 main { flex: 1; display: flex; flex-direction: column; }
 .auth-area { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 64px 24px; }
 .auth-card { width: 420px; max-width: 100%; padding: 32px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
