@@ -17,7 +17,7 @@ const report = ref<ImportResult | null>(null)
 const settingsOpen = ref(false)
 let latestRequest = 0
 type ListName = DeckCard['list_name']
-type Action = 'add' | 'decrease' | 'remove'
+type Action = 'add' | 'decrease' | 'remove' | 'move'
 const saving = ref(false)
 const editError = ref('')
 
@@ -145,6 +145,9 @@ watch(() => route.params.id, (id) => {
                 <button :disabled="saving || loading" aria-label="Padidinti kiekį" @click="edit(card.oracle_id, card.list_name, 'add')">+</button>
                 <button :disabled="saving || loading" aria-label="Sumažinti kiekį" @click="edit(card.oracle_id, card.list_name, 'decrease')">−</button>
                 <button :disabled="saving || loading" @click="edit(card.oracle_id, card.list_name, 'remove')">Pašalinti</button>
+                <button :disabled="saving || loading" @click="edit(card.oracle_id, card.list_name, 'move')">
+                  {{ card.list_name === 'main' ? 'Perkelti į svarstomas' : 'Perkelti į pagrindines' }}
+                </button>
               </div>
             </li>
           </ul>
