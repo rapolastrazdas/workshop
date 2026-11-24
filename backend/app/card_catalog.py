@@ -4,7 +4,7 @@ from uuid import UUID
 
 import httpx
 
-from .card_import import card_name_keys
+from .card_import import card_name_keys, normalize_card_name
 
 MANA_COLORS = ("W", "U", "B", "R", "G")
 
@@ -21,6 +21,18 @@ class CardCatalog:
         self.collection = collection or os.getenv("QDRANT_CARDS_COLLECTION", "cards")
 
     def colors_for(self, oracle_ids: set[str]) -> dict[str, list[str]]:
+        return self.colors_from(self.payloads_for(oracle_ids, ["colors"]))
+
+    @staticmethod
+    def colors_from(payloads: dict[str, dict]) -> dict[str, list[str]]:
+        result = {}
+        for oracle_id, payload in payloads.items():
+            colors = payload.get("colors")
+            if isinstance(colors, list) and all(color in MANA_COLORS for color in colors):
+                result[oracle_id] = [color for color in MANA_COLORS if color in colors]
+        return result
+
+    def payloads_for(self, oracle_ids: set[str], fields: list[str]) -> dict[str, dict]:
         if not oracle_ids:
             return {}
         ids = sorted(oracle_ids)
@@ -30,16 +42,14 @@ class CardCatalog:
                 for offset in range(0, len(ids), 256):
                     response = client.post(
                         f"/collections/{quote(self.collection, safe='')}/points",
-                        json={"ids": ids[offset:offset + 256], "with_payload": ["colors"], "with_vector": False},
+                        json={"ids": ids[offset:offset + 256], "with_payload": fields, "with_vector": False},
                     )
                     # Before NI-23 imports cards there may be no collection yet.
                     if response.status_code == 404:
                         return {}
                     response.raise_for_status()
                     for point in response.json()["result"]:
-                        colors = (point.get("payload") or {}).get("colors")
-                        if isinstance(colors, list) and all(color in MANA_COLORS for color in colors):
-                            result[str(point["id"])] = [color for color in MANA_COLORS if color in colors]
+                        result[str(point["id"])] = point.get("payload") or {}
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             raise CardCatalogUnavailable from error
         return result
@@ -47,8 +57,8 @@ class CardCatalog:
     def find_by_names(self, names: set[str]) -> dict[str, str]:
         if not names:
             return {}
-        result = {}
-        ambiguous = set()
+        exact_matches: dict[str, set[str]] = {}
+        alias_matches: dict[str, set[str]] = {}
         keys = sorted(names)
         try:
             with httpx.Client(base_url=self.base_url, timeout=5.0) as client:
@@ -71,16 +81,21 @@ class CardCatalog:
                             oracle_id = str(UUID(str(point["id"])))
                             payload = point.get("payload") or {}
                             aliases = payload.get("name_keys") or card_name_keys(payload.get("name", ""))
+                            full_name = normalize_card_name(payload.get("name", ""))
                             for key in requested.intersection(aliases):
-                                if key in result and result[key] != oracle_id:
-                                    ambiguous.add(key)
-                                result[key] = oracle_id
+                                matches = exact_matches if key == full_name else alias_matches
+                                matches.setdefault(key, set()).add(oracle_id)
                         offset = page.get("next_page_offset")
                         if offset is None:
                             break
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             raise CardCatalogUnavailable from error
-        return {key: value for key, value in result.items() if key not in ambiguous}
+        result = {}
+        for key in keys:
+            matches = exact_matches.get(key) or alias_matches.get(key)
+            if matches and len(matches) == 1:
+                result[key] = next(iter(matches))
+        return result
 
 
 def get_card_catalog() -> CardCatalog:

@@ -22,6 +22,16 @@ Duomenų bazė ir jos lentelės paruošiamos automatiškai.
 
 Naršyklėje atidarykite **http://localhost:8080**.
 
+Kad naujoje vietinėje aplinkoje būtų galima importuoti kalades ir matyti kortų
+duomenis, paleidę konteinerius vieną kartą įkelkite „Scryfall“ kortų katalogą:
+
+```sh
+docker compose exec -T backend python -m app.bootstrap_catalog
+```
+
+Komanda papildo „Qdrant“ trūkstamų kortų metaduomenimis. Jie išlieka sustabdžius
+konteinerius. DI vektorių skaičiavimas ir periodinis atnaujinimas yra atskiros užduotys.
+
 Norėdami sustabdyti, paleiskite `sustabdyti.bat` (Windows) arba vykdykite:
 
 ```sh
