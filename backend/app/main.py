@@ -4,6 +4,7 @@ import os
 import secrets
 import time
 from typing import Annotated, Literal
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .models import AuthSession, Deck, DeckCard, User
 from .card_catalog import CardCatalog, CardCatalogUnavailable, MANA_COLORS, get_card_catalog
-from .card_import import ImportResult, apply_card_import, parse_card_list
+from .card_import import MAIN_CARD_LIMIT, ImportResult, apply_card_import, parse_card_list
 
 app = FastAPI(title="Urza's Workshop", version="0.1.0")
 from .search import router as search_router
@@ -357,6 +358,10 @@ def deck(deck_id: str, session: CurrentSession, db: Db, catalog: Catalog):
     owned = db.scalar(select(Deck).where(Deck.id == parse_deck_id(deck_id), Deck.user_id == session.user_id))
     if owned is None:
         raise HTTPException(404, "Kaladė nerasta.")
+    return deck_detail(owned, db, catalog)
+
+
+def deck_detail(owned: Deck, db: Session, catalog: CardCatalog):
     cards = list(db.scalars(select(DeckCard).where(DeckCard.deck_id == owned.id)
                             .order_by(DeckCard.list_name, DeckCard.oracle_id)))
     try:
@@ -387,3 +392,42 @@ def deck(deck_id: str, session: CurrentSession, db: Db, catalog: Catalog):
             is_land="Land" in front_types,
         ))
     return DeckDetailOut(**summary.model_dump(), cards=details)
+
+
+class CardEdit(BaseModel):
+    oracle_id: UUID
+    list_name: Literal["main", "maybeboard"]
+    action: Literal["add", "decrease", "remove"]
+
+
+@app.post("/api/decks/{deck_id}/cards", response_model=DeckDetailOut)
+def edit_card(deck_id: str, data: CardEdit, session: CurrentSession, db: Db, catalog: Catalog):
+    owned = db.scalar(select(Deck).where(Deck.id == parse_deck_id(deck_id),
+                                         Deck.user_id == session.user_id).with_for_update())
+    if owned is None:
+        raise HTTPException(404, "Kaladė nerasta.")
+    oracle_id = str(data.oracle_id)
+    card = db.get(DeckCard, (owned.id, oracle_id, data.list_name))
+    if data.action == "add":
+        if card is None:
+            try:
+                known = catalog.payloads_for({oracle_id}, ["name"])
+            except CardCatalogUnavailable:
+                raise HTTPException(503, "Kortų katalogas nepasiekiamas.") from None
+            if oracle_id not in known:
+                raise HTTPException(422, "Kortos nėra vietiniame kataloge.")
+            db.add(DeckCard(deck_id=owned.id, oracle_id=oracle_id, list_name=data.list_name, quantity=1))
+        else:
+            card.quantity += 1
+    elif card is None:
+        raise HTTPException(409, "Kortos sąraše nėra.")
+    elif data.action == "remove" or card.quantity == 1:
+        db.delete(card)
+    else:
+        card.quantity -= 1
+    db.flush()
+    result = deck_detail(owned, db, catalog)
+    if result.card_count > MAIN_CARD_LIMIT:
+        raise HTTPException(422, "Kaladėje gali būti ne daugiau kaip 500 pagrindinių kortų.")
+    db.commit()
+    return result

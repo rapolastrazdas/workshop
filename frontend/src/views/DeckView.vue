@@ -16,6 +16,27 @@ const notFound = ref(false)
 const report = ref<ImportResult | null>(null)
 const settingsOpen = ref(false)
 let latestRequest = 0
+type ListName = DeckCard['list_name']
+type Action = 'add' | 'decrease' | 'remove'
+const saving = ref(false)
+const editError = ref('')
+
+async function edit(oracle_id: string, list_name: ListName, action: Action) {
+  const current = deck.value
+  if (!current || saving.value || loading.value) return
+  saving.value = true
+  editError.value = ''
+  const request = ++latestRequest
+  try {
+    const updated = await api<DeckDetail>('/decks/' + current.id + '/cards', {
+      method: 'POST', body: JSON.stringify({ oracle_id, list_name, action }),
+    })
+    if (request === latestRequest) deck.value = updated
+  } catch (cause) {
+    if (request === latestRequest) editError.value = cause instanceof ApiError && cause.status === 422
+      ? cause.message : 'Pakeitimo išsaugoti nepavyko, jis atšauktas. Bandykite dar kartą.'
+  } finally { saving.value = false }
+}
 
 const cards = computed(() => [...(deck.value?.cards ?? [])].sort(
   (left, right) => (left.name ?? '').localeCompare(right.name ?? '', 'lt') ||
@@ -92,7 +113,13 @@ watch(() => route.params.id, (id) => {
       <button class="button" @click="load">Bandyti dar kartą</button>
     </div>
     <template v-else-if="deck">
-      <CardSearch />
+      <CardSearch>
+        <template #actions="{ card }">
+          <button class="button" :disabled="saving || loading" @click="edit(card.id, 'main', 'add')">+ Pagrindinis</button>
+          <button class="button" :disabled="saving || loading" @click="edit(card.id, 'maybeboard', 'add')">+ Svarstomos</button>
+        </template>
+      </CardSearch>
+      <p v-if="editError" role="alert" class="error-banner">{{ editError }}</p>
       <ImportResultDialog v-if="report && (report.unrecognized_lines.length || report.skipped_main)" :deck-id="deck.id" :deck-name="deck.name" :result="report" @close="report = null" @updated="imported" />
       <DeckSettingsDialog v-if="settingsOpen" :deck="deck" @close="settingsOpen = false" @saved="settingsSaved" />
       <div class="decks-heading">
@@ -114,6 +141,11 @@ watch(() => route.params.id, (id) => {
               <span>{{ card.quantity }}×</span>
               <span>{{ card.name ?? 'Nežinoma korta' }}</span>
               <span class="deck-mana-cost">{{ card.mana_cost === null ? '—' : card.mana_cost }}</span>
+              <div class="card-actions">
+                <button :disabled="saving || loading" aria-label="Padidinti kiekį" @click="edit(card.oracle_id, card.list_name, 'add')">+</button>
+                <button :disabled="saving || loading" aria-label="Sumažinti kiekį" @click="edit(card.oracle_id, card.list_name, 'decrease')">−</button>
+                <button :disabled="saving || loading" @click="edit(card.oracle_id, card.list_name, 'remove')">Pašalinti</button>
+              </div>
             </li>
           </ul>
         </section>
