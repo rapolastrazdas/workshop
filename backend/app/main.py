@@ -83,6 +83,10 @@ class DeckSettings(BaseModel):
     card_list: str = ""
 
 
+class DeckDeletion(BaseModel):
+    name: str
+
+
 class CardListImport(BaseModel):
     card_list: str
 
@@ -311,6 +315,19 @@ def update_deck(deck_id: str, data: DeckSettings, session: CurrentSession, db: D
     response = DeckWriteOut(deck=summarize_decks(db, [owned], catalog)[0], import_result=result)
     db.commit()
     return response
+
+
+@app.delete("/api/decks/{deck_id}", status_code=204)
+def delete_deck(deck_id: str, data: DeckDeletion, session: CurrentSession, db: Db):
+    owned = db.scalar(select(Deck).where(Deck.id == parse_deck_id(deck_id), Deck.user_id == session.user_id).with_for_update())
+    if owned is None:
+        raise HTTPException(404, "Kaladė nerasta.")
+    if data.name != owned.name:
+        raise HTTPException(422, {"errors": {"name": "Įvestas pavadinimas nesutampa su kaladės pavadinimu."}})
+    # The existing foreign key removes main and maybeboard entries atomically.
+    db.delete(owned)
+    db.commit()
+    return Response(status_code=204)
 
 
 @app.get("/api/decks/{deck_id}", response_model=DeckOut)

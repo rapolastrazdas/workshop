@@ -25,7 +25,7 @@ test('current name is shown and a saved rename immediately updates editor and li
   await expect(dialog.getByLabel('Pavadinimas', { exact: true })).toHaveValue('Original')
   await expect(dialog.getByLabel('Kortų importas (nebūtinas)', { exact: true })).toHaveValue('')
   await expect(dialog.getByLabel(/Formatas|Bracket/)).toHaveCount(0)
-  await expect(dialog.getByRole('button', { name: 'Ištrinti kaladę', exact: true })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: 'Ištrinti kaladę', exact: true })).toBeEnabled()
   await dialog.getByLabel('Pavadinimas', { exact: true }).fill('Atnaujinta kaladė')
   await dialog.getByRole('button', { name: 'Išsaugoti', exact: true }).click()
   await expect(dialog).toHaveCount(0)
