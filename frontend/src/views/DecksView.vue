@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CardSearch from "../components/CardSearch.vue"
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api, ApiError } from '../auth'
@@ -30,6 +31,7 @@ onMounted(load)
 
 <template>
   <section class="content-area" aria-labelledby="decks-title" :aria-busy="loading">
+    <CardSearch collapsible />
     <div class="decks-heading">
       <div class="heading-with-count">
         <h1 id="decks-title">Mano kaladės</h1>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CardSearch from "../components/CardSearch.vue"
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { api, ApiError } from '../auth'
@@ -91,6 +92,7 @@ watch(() => route.params.id, (id) => {
       <button class="button" @click="load">Bandyti dar kartą</button>
     </div>
     <template v-else-if="deck">
+      <CardSearch />
       <ImportResultDialog v-if="report && (report.unrecognized_lines.length || report.skipped_main)" :deck-id="deck.id" :deck-name="deck.name" :result="report" @close="report = null" @updated="imported" />
       <DeckSettingsDialog v-if="settingsOpen" :deck="deck" @close="settingsOpen = false" @saved="settingsSaved" />
       <div class="decks-heading">

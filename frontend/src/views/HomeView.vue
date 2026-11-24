@@ -1,3 +1,6 @@
+<script setup lang="ts">
+import CardSearch from "../components/CardSearch.vue"
+</script>
 <template>
-  <div class="guest-placeholder" aria-label="Pagrindinis puslapis"></div>
+  <main class="content-area"><CardSearch /></main>
 </template>

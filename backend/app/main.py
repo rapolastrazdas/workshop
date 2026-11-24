@@ -19,6 +19,9 @@ from .card_catalog import CardCatalog, CardCatalogUnavailable, MANA_COLORS, get_
 from .card_import import ImportResult, apply_card_import, parse_card_list
 
 app = FastAPI(title="Urza's Workshop", version="0.1.0")
+from .search import router as search_router
+
+app.include_router(search_router)
 passwords = PasswordHash.recommended()
 # Verify a real hash for unknown accounts too, avoiding an obvious timing shortcut.
 dummy_hash = passwords.hash(secrets.token_urlsafe(32))
