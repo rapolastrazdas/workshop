@@ -2,20 +2,20 @@ import time
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import event, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base, get_db
+from app.database import Base, get_db, make_engine
 from app.main import app, fingerprint
-from app.models import AuthSession, User
+from app.models import AuthSession, Deck, User
 
 PASSWORD = "TvirtasSlaptazodis9!"
 
 
 @pytest.fixture
 def client():
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    engine = make_engine("sqlite://", poolclass=StaticPool)
     Base.metadata.create_all(engine)
     factory = sessionmaker(engine, expire_on_commit=False)
 
@@ -130,3 +130,88 @@ def test_expired_token_rejected(client):
         assert response.status_code == 401
         assert "sesija baigėsi" in response.json()["detail"]
     assert http.post("/api/auth/logout", headers=header(token)).status_code == 401
+
+
+@pytest.mark.parametrize("password", ["wrong-password", "", "x" * 1025])
+def test_account_wrong_password_preserves_all_data(client, password):
+    http, factory = client
+    account = register(http).json()
+    with factory() as db:
+        db.add(Deck(user_id=account["user"]["id"], name="Keep this deck"))
+        db.commit()
+    response = http.request("DELETE", "/api/auth/account", headers=header(account["access_token"]), json={"password": password})
+    assert response.status_code == 403
+    assert response.json()["detail"]["errors"]["password"] == "Neteisingas slaptažodis."
+    with factory() as db:
+        assert db.get(User, account["user"]["id"]) is not None
+        assert len(db.scalars(select(Deck)).all()) == 1
+        assert len(db.scalars(select(AuthSession)).all()) == 1
+    assert http.get("/api/auth/me", headers=header(account["access_token"])).status_code == 200
+
+
+def test_account_deletion_removes_decks_and_all_sessions_only_for_owner(client):
+    http, factory = client
+    account = register(http).json()
+    second_token = http.post("/api/auth/login", json={"email": account["user"]["email"], "password": PASSWORD}).json()["access_token"]
+    other = register(http, "other@example.com").json()
+    with factory() as db:
+        db.add_all([
+            Deck(user_id=account["user"]["id"], name="First deck"),
+            Deck(user_id=account["user"]["id"], name="Second deck"),
+            Deck(user_id=other["user"]["id"], name="Other player's deck"),
+        ])
+        db.commit()
+    # A submitted user ID cannot redirect deletion to somebody else's account.
+    response = http.request("DELETE", "/api/auth/account", headers=header(account["access_token"]),
+                            json={"password": PASSWORD, "user_id": other["user"]["id"]})
+    assert response.status_code == 204
+    with factory() as db:
+        assert db.get(User, account["user"]["id"]) is None
+        assert db.get(User, other["user"]["id"]) is not None
+        assert [deck.user_id for deck in db.scalars(select(Deck))] == [other["user"]["id"]]
+        assert [session.user_id for session in db.scalars(select(AuthSession))] == [other["user"]["id"]]
+    for token in [account["access_token"], second_token]:
+        assert http.get("/api/auth/me", headers=header(token)).status_code == 401
+        assert http.get("/api/decks", headers=header(token)).status_code == 401
+    assert http.get("/api/auth/me", headers=header(other["access_token"])).status_code == 200
+    assert http.post("/api/auth/login", json={"email": account["user"]["email"], "password": PASSWORD}).status_code == 401
+    # No account record remains reserving the old email.
+    assert register(http).status_code == 201
+
+
+@pytest.mark.parametrize("credential", ["missing", "forged", "expired"])
+def test_account_deletion_requires_valid_session(client, credential):
+    http, factory = client
+    account = register(http).json()
+    if credential == "expired":
+        with factory() as db:
+            db.get(AuthSession, fingerprint(account["access_token"])).expires_at = int(time.time()) - 1
+            db.commit()
+    headers = {} if credential == "missing" else header(account["access_token"] if credential == "expired" else "fake")
+    response = http.request("DELETE", "/api/auth/account", headers=headers, json={"password": PASSWORD})
+    assert response.status_code == 401
+    with factory() as db:
+        assert db.get(User, account["user"]["id"]) is not None
+
+
+def test_account_deletion_rolls_back_when_transaction_fails(client):
+    http, factory = client
+    account = register(http).json()
+    with factory() as db:
+        db.add(Deck(user_id=account["user"]["id"], name="Keep after rollback"))
+        db.commit()
+
+    def fail_after_delete(db):
+        db.flush()
+        raise RuntimeError("Simulated commit failure")
+
+    event.listen(factory.class_, "before_commit", fail_after_delete)
+    try:
+        with pytest.raises(RuntimeError, match="Simulated commit failure"):
+            http.request("DELETE", "/api/auth/account", headers=header(account["access_token"]), json={"password": PASSWORD})
+    finally:
+        event.remove(factory.class_, "before_commit", fail_after_delete)
+    with factory() as db:
+        assert db.get(User, account["user"]["id"]) is not None
+        assert len(db.scalars(select(Deck)).all()) == 1
+        assert len(db.scalars(select(AuthSession)).all()) == 1

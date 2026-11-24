@@ -3,9 +3,11 @@ import { ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import { api, ApiError, auth, clearSession } from './auth'
 import { router } from './router'
+import DeleteAccountDialog from './components/DeleteAccountDialog.vue'
 
 const loggingOut = ref(false)
 const logoutError = ref('')
+const deletingAccount = ref(false)
 
 async function logout() {
   if (loggingOut.value) return
@@ -34,7 +36,7 @@ async function logout() {
         <template v-if="auth.session">
           <span class="account-email">{{ auth.session.user.email }}</span>
           <button class="button" :disabled="loggingOut" @click="logout">{{ loggingOut ? 'Atsijungiama…' : 'Atsijungti' }}</button>
-          <button class="button button-danger" disabled title="Paskyros šalinimas bus įgyvendintas kitoje užduotyje">Šalinti paskyrą</button>
+          <button class="button button-danger" :disabled="loggingOut" @click="deletingAccount = true">Šalinti paskyrą</button>
         </template>
         <template v-else>
           <RouterLink class="button" to="/prisijungimas">Prisijungti</RouterLink>
@@ -42,6 +44,7 @@ async function logout() {
         </template>
       </nav>
     </header>
+    <DeleteAccountDialog v-if="deletingAccount && auth.session" @close="deletingAccount = false" />
     <div v-if="logoutError" class="global-notice error-banner" role="alert">{{ logoutError }}</div>
     <main id="main-content">
       <div v-if="auth.notice" class="global-notice info-banner" role="alert">{{ auth.notice }}</div>

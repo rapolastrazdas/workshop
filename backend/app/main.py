@@ -41,6 +41,10 @@ class Login(BaseModel):
     password: str
 
 
+class AccountDeletion(BaseModel):
+    password: str
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -147,6 +151,21 @@ def me(session: CurrentSession, db: Db):
 @app.post("/api/auth/logout", status_code=204)
 def logout(session: CurrentSession, db: Db):
     db.delete(session)
+    db.commit()
+    return Response(status_code=204)
+
+
+@app.delete("/api/auth/account", status_code=204)
+def delete_account(data: AccountDeletion, session: CurrentSession, db: Db):
+    # Lock the account while confirming and deleting its dependent records.
+    user = db.scalar(select(User).where(User.id == session.user_id).with_for_update())
+    if user is None:
+        raise HTTPException(401, EXPIRED_SESSION)
+    password = data.password if len(data.password) <= 1024 else ""
+    if not passwords.verify(password, user.password_hash) or len(data.password) > 1024:
+        raise HTTPException(403, {"errors": {"password": "Neteisingas slaptažodis."}})
+    # Foreign keys cascade to decks and every session in the same transaction.
+    db.delete(user)
     db.commit()
     return Response(status_code=204)
 

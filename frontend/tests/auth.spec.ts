@@ -19,7 +19,7 @@ test('registration, reload, logout and login', async ({ page }) => {
   await register(page, address)
   await expect(page.getByRole('heading', { name: 'Mano kaladės' })).toBeVisible()
   await expect(page.getByText(address, { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Šalinti paskyrą' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Šalinti paskyrą' })).toBeEnabled()
   await page.reload()
   await expect(page.getByRole('button', { name: 'Atsijungti', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Atsijungti', exact: true }).click()
