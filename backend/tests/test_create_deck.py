@@ -42,7 +42,7 @@ def test_named_deck_is_saved_owned_and_visible(account):
     with factory() as db:
         assert db.get(Deck, deck["id"]).user_id == user_id
     assert http.get("/api/decks", headers=headers).json() == {"count": 1, "decks": [deck]}
-    assert http.get(f"/api/decks/{deck['id']}", headers=headers).json() == deck
+    assert http.get(f"/api/decks/{deck['id']}", headers=headers).json() == {**deck, "cards": []}
 
 
 def test_automatic_names_count_owned_decks_and_skip_collisions(account):

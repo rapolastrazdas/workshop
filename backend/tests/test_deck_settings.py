@@ -18,6 +18,9 @@ class Catalog:
     def colors_for(self, ids):
         return {oracle_id: ["R"] if oracle_id == BOLT else ["U"] for oracle_id in ids}
 
+    def payloads_for(self, ids, fields):
+        return {oracle_id: {"colors": colors} for oracle_id, colors in self.colors_for(ids).items()}
+
 
 @pytest.fixture
 def settings(client):
@@ -46,7 +49,12 @@ def test_rename_and_import_add_to_existing_cards_and_update_list(settings):
     assert data["deck"]["card_count"] == 6
     assert data["deck"]["colors"] == ["U", "R"]
     assert data["import_result"]["imported"] == 6
-    assert http.get(f"/api/decks/{deck['id']}", headers=headers).json() == data["deck"]
+    detail = http.get(f"/api/decks/{deck['id']}", headers=headers).json()
+    cards = detail.pop("cards")
+    assert detail == data["deck"]
+    assert {(card["oracle_id"], card["list_name"]): card["quantity"] for card in cards} == {
+        (BOLT, "main"): 5, (BLUE, "main"): 1, (BOLT, "maybeboard"): 3,
+    }
     assert http.get("/api/decks", headers=headers).json()["decks"] == [data["deck"]]
     with factory() as db:
         rows = {(row.oracle_id, row.list_name): row.quantity for row in db.scalars(select(DeckCard))}
