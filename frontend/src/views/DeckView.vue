@@ -5,6 +5,7 @@ import { api, ApiError } from '../auth'
 import { consumeImport, type DeckSummary, type DeckWrite, type ImportResult } from '../decks'
 import DeckColors from '../components/DeckColors.vue'
 import ImportResultDialog from '../components/ImportResultDialog.vue'
+import DeckSettingsDialog from '../components/DeckSettingsDialog.vue'
 
 const route = useRoute()
 const deck = ref<DeckSummary | null>(null)
@@ -12,6 +13,12 @@ const loading = ref(true)
 const error = ref('')
 const notFound = ref(false)
 const report = ref<ImportResult | null>(consumeImport(Number(route.params.id)))
+const settingsOpen = ref(false)
+
+function settingsSaved(result: DeckWrite) {
+  settingsOpen.value = false
+  imported(result)
+}
 
 function imported(result: DeckWrite) {
   deck.value = result.deck
@@ -48,7 +55,11 @@ onMounted(load)
     </div>
     <template v-else-if="deck">
       <ImportResultDialog v-if="report && (report.unrecognized_lines.length || report.skipped_main)" :deck-id="deck.id" :result="report" @close="report = null" @updated="imported" />
-      <h1>{{ deck.name }}</h1>
+      <DeckSettingsDialog v-if="settingsOpen" :deck="deck" @close="settingsOpen = false" @saved="settingsSaved" />
+      <div class="decks-heading">
+        <h1>{{ deck.name }}</h1>
+        <button class="button" @click="settingsOpen = true">Nustatymai</button>
+      </div>
       <p class="muted">Kortų: {{ deck.card_count }}</p>
       <DeckColors :colors="deck.colors" :known="deck.colors_known" :card-count="deck.card_count" />
       <div class="editor-placeholder">

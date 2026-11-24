@@ -78,6 +78,11 @@ class DeckCreate(BaseModel):
     card_list: str = ""
 
 
+class DeckSettings(BaseModel):
+    name: str
+    card_list: str = ""
+
+
 class CardListImport(BaseModel):
     card_list: str
 
@@ -286,6 +291,22 @@ def import_into_deck(deck_id: str, data: CardListImport, session: CurrentSession
     if owned is None:
         raise HTTPException(404, "Kaladė nerasta.")
     result = import_cards(db, owned.id, data.card_list, catalog)
+    db.flush()
+    response = DeckWriteOut(deck=summarize_decks(db, [owned], catalog)[0], import_result=result)
+    db.commit()
+    return response
+
+
+@app.put("/api/decks/{deck_id}", response_model=DeckWriteOut)
+def update_deck(deck_id: str, data: DeckSettings, session: CurrentSession, db: Db, catalog: Catalog):
+    owned = db.scalar(select(Deck).where(Deck.id == parse_deck_id(deck_id), Deck.user_id == session.user_id).with_for_update())
+    if owned is None:
+        raise HTTPException(404, "Kaladė nerasta.")
+    name = data.name.strip()
+    if not 1 <= len(name) <= 100:
+        raise HTTPException(422, {"errors": {"name": "Pavadinimą turi sudaryti nuo 1 iki 100 simbolių."}})
+    owned.name = name
+    result = import_cards(db, owned.id, data.card_list, catalog) if data.card_list.strip() else None
     db.flush()
     response = DeckWriteOut(deck=summarize_decks(db, [owned], catalog)[0], import_result=result)
     db.commit()
