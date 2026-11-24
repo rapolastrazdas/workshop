@@ -11,7 +11,15 @@ test('result follows the mockup and corrected lines require an explicit button c
       unrecognized_lines: [{ text: '1 Sol Rign (C21) 263', list_name: 'main' }],
     } } })
   })
-  await page.route('**/api/decks/501', (route) => route.fulfill({ json: deck }))
+  await page.route('**/api/decks/501', (route) => {
+    const cards = [
+      { oracle_id: 'bolt', list_name: 'main', quantity: 2, name: 'Lightning Bolt', mana_cost: '{R}', mana_value: 1, is_land: false },
+    ]
+    if (writes === 2) {
+      cards.push({ oracle_id: 'ring', list_name: 'main', quantity: 1, name: 'Sol Ring', mana_cost: '{1}', mana_value: 1, is_land: false })
+    }
+    return route.fulfill({ json: { ...deck, card_count: writes === 2 ? 3 : 2, cards } })
+  })
   await page.route('**/api/decks/501/import', (route) => {
     writes++
     expect(route.request().postDataJSON()).toEqual({ card_list: '1 Sol Ring (C21) 263' })
@@ -45,4 +53,5 @@ test('result follows the mockup and corrected lines require an explicit button c
   await expect(result).toHaveCount(0)
   expect(writes).toBe(2)
   await expect(page.getByText('Kortų: 3', { exact: true })).toBeVisible()
+  await expect(page.getByText('Sol Ring', { exact: true })).toBeVisible()
 })

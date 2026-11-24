@@ -16,9 +16,19 @@ class CardCatalogUnavailable(Exception):
 class CardCatalog:
     """Read public card metadata by Oracle ID; deck ownership stays in PostgreSQL."""
 
-    def __init__(self, base_url: str | None = None, collection: str | None = None):
+    def __init__(self, base_url: str | None = None, collection: str | None = None,
+                 fallback_collection: str | None = None):
         self.base_url = base_url or os.getenv("QDRANT_URL", "http://127.0.0.1:6333")
         self.collection = collection or os.getenv("QDRANT_CARDS_COLLECTION", "cards")
+        self.fallback_collection = fallback_collection
+
+    def _post(self, client: httpx.Client, endpoint: str, body: dict) -> httpx.Response:
+        response = client.post(f"/collections/{quote(self.collection, safe='')}/{endpoint}", json=body)
+        if response.status_code == 404 and self.fallback_collection:
+            return client.post(
+                f"/collections/{quote(self.fallback_collection, safe='')}/{endpoint}", json=body,
+            )
+        return response
 
     def colors_for(self, oracle_ids: set[str]) -> dict[str, list[str]]:
         return self.colors_from(self.payloads_for(oracle_ids, ["colors"]))
@@ -40,9 +50,9 @@ class CardCatalog:
         try:
             with httpx.Client(base_url=self.base_url, timeout=5.0) as client:
                 for offset in range(0, len(ids), 256):
-                    response = client.post(
-                        f"/collections/{quote(self.collection, safe='')}/points",
-                        json={"ids": ids[offset:offset + 256], "with_payload": fields, "with_vector": False},
+                    response = self._post(
+                        client, "points",
+                        {"ids": ids[offset:offset + 256], "with_payload": fields, "with_vector": False},
                     )
                     # Before NI-23 imports cards there may be no collection yet.
                     if response.status_code == 404:
@@ -72,7 +82,7 @@ class CardCatalog:
                         }
                         if offset is not None:
                             body["offset"] = offset
-                        response = client.post(f"/collections/{quote(self.collection, safe='')}/points/scroll", json=body)
+                        response = self._post(client, "points/scroll", body)
                         if response.status_code == 404:
                             return {}
                         response.raise_for_status()
@@ -80,23 +90,21 @@ class CardCatalog:
                         for point in page["points"]:
                             oracle_id = str(UUID(str(point["id"])))
                             payload = point.get("payload") or {}
-                            aliases = payload.get("name_keys") or card_name_keys(payload.get("name", ""))
-                            full_name = normalize_card_name(payload.get("name", ""))
+                            name = payload.get("name", "")
+                            exact = normalize_card_name(name)
+                            aliases = payload.get("name_keys") or card_name_keys(name)
                             for key in requested.intersection(aliases):
-                                matches = exact_matches if key == full_name else alias_matches
+                                matches = exact_matches if key == exact else alias_matches
                                 matches.setdefault(key, set()).add(oracle_id)
                         offset = page.get("next_page_offset")
                         if offset is None:
                             break
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             raise CardCatalogUnavailable from error
-        result = {}
-        for key in keys:
-            matches = exact_matches.get(key) or alias_matches.get(key)
-            if matches and len(matches) == 1:
-                result[key] = next(iter(matches))
-        return result
+        preferred = {**alias_matches, **exact_matches}
+        return {key: next(iter(ids)) for key, ids in preferred.items() if len(ids) == 1}
 
 
 def get_card_catalog() -> CardCatalog:
-    return CardCatalog()
+    legacy = os.getenv("QDRANT_CARDS_COLLECTION", "cards")
+    return CardCatalog(collection=f"{legacy}__current", fallback_collection=legacy)

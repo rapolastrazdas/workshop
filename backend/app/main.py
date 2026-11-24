@@ -359,7 +359,7 @@ def deck(deck_id: str, session: CurrentSession, db: Db, catalog: Catalog):
     try:
         payloads = catalog.payloads_for(
             {card.oracle_id for card in cards},
-            ["name", "mana_cost", "cmc", "mana_value", "type_line", "colors"],
+            ["name", "mana_cost", "cmc", "mana_value", "type_line", "colors", "card_faces"],
         ) if cards else {}
     except CardCatalogUnavailable:
         raise HTTPException(503, "Nepavyko gauti kortų duomenų. Bandykite dar kartą.") from None
@@ -372,6 +372,9 @@ def deck(deck_id: str, session: CurrentSession, db: Db, catalog: Catalog):
         payload = payloads.get(card.oracle_id, {})
         name = payload.get("name")
         mana_cost = payload.get("mana_cost")
+        faces = payload.get("card_faces") or []
+        if not mana_cost and faces:
+            mana_cost = faces[0].get("mana_cost")
         mana_value = payload.get("mana_value", payload.get("cmc"))
         type_line = payload.get("type_line")
         # Use the front face's card types, without subtypes such as Land in a name.

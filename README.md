@@ -3,7 +3,7 @@
 MTG kortų kaladžių kūrimo sistema. Šiuo metu veikia registracija,
 prisijungimas, atsijungimas, paskyros ištrynimas ir savo kaladžių sąrašo peržiūra.
 Galima kurti ir ištrinti kalades, keisti jų pavadinimus ir importuoti papildomus tekstinius kortų sąrašus iš turimo kortų katalogo.
-Visas kaladžių redagavimas ir kortų paieška bus pridėti vėliau.
+Kaladės redaktoriuje pagrindinės ir svarstomos kortos rodomos atskirai.
 
 ## Paleidimas su Docker
 
@@ -19,18 +19,12 @@ docker compose up --build -d --wait
 ```
 
 Duomenų bazė ir jos lentelės paruošiamos automatiškai.
+Kortų katalogas pirmą kartą atsisiunčiamas fone, todėl kortų importas
+pradeda veikti užbaigus pirmą atsisiuntimą. Eigą rodo
+`docker compose logs card-updater`, rankinį patikrinimą paleidžia
+`docker compose exec -T card-updater python -m app.catalog_update`.
 
 Naršyklėje atidarykite **http://localhost:8080**.
-
-Kad naujoje vietinėje aplinkoje būtų galima importuoti kalades ir matyti kortų
-duomenis, paleidę konteinerius vieną kartą įkelkite „Scryfall“ kortų katalogą:
-
-```sh
-docker compose exec -T backend python -m app.bootstrap_catalog
-```
-
-Komanda papildo „Qdrant“ trūkstamų kortų metaduomenimis. Jie išlieka sustabdžius
-konteinerius. DI vektorių skaičiavimas ir periodinis atnaujinimas yra atskiros užduotys.
 
 Norėdami sustabdyti, paleiskite `sustabdyti.bat` (Windows) arba vykdykite:
 
