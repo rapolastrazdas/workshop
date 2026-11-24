@@ -397,7 +397,7 @@ def deck_detail(owned: Deck, db: Session, catalog: CardCatalog):
 class CardEdit(BaseModel):
     oracle_id: UUID
     list_name: Literal["main", "maybeboard"]
-    action: Literal["add", "decrease", "remove"]
+    action: Literal["add", "decrease", "remove", "move"]
 
 
 @app.post("/api/decks/{deck_id}/cards", response_model=DeckDetailOut)
@@ -421,6 +421,14 @@ def edit_card(deck_id: str, data: CardEdit, session: CurrentSession, db: Db, cat
             card.quantity += 1
     elif card is None:
         raise HTTPException(409, "Kortos sąraše nėra.")
+    elif data.action == "move":
+        target_list = "maybeboard" if card.list_name == "main" else "main"
+        target = db.get(DeckCard, (owned.id, oracle_id, target_list))
+        if target is None:
+            card.list_name = target_list
+        else:
+            target.quantity += card.quantity
+            db.delete(card)
     elif data.action == "remove" or card.quantity == 1:
         db.delete(card)
     else:
