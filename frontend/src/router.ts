@@ -4,6 +4,7 @@ import AuthView from './views/AuthView.vue'
 import HomeView from './views/HomeView.vue'
 import DecksView from './views/DecksView.vue'
 import DeckView from './views/DeckView.vue'
+import { clearNoticeOnNavigation, showNotice } from './notices'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -21,18 +22,23 @@ router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth && !auth.session) return true
   try {
     const signedIn = await verifySession()
-    if (!signedIn && auth.notice && to.name !== 'login') return { name: 'login' }
+    if (!signedIn && to.name !== 'login') return { name: 'login' }
     if (to.meta.requiresAuth && !signedIn) return { name: 'login' }
     if (signedIn && ['login', 'register'].includes(String(to.name))) return { name: 'decks' }
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       if (to.meta.requiresAuth) return { name: 'login' }
     } else {
-      auth.notice = error instanceof Error ? error.message : 'Nepavyko patikrinti sesijos.'
+      showNotice(error instanceof Error ? error.message : 'Nepavyko patikrinti sesijos.',
+        to.meta.requiresAuth ? '/prisijungimas' : to.path, 'error')
       if (to.meta.requiresAuth) return { name: 'login' }
     }
   }
   return true
+})
+
+router.afterEach((to, _from, failure) => {
+  if (!failure) clearNoticeOnNavigation(to.path)
 })
 
 window.addEventListener('workshop:session-expired', () => {

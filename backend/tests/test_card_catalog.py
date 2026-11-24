@@ -49,3 +49,25 @@ def test_catalog_errors_are_reported(monkeypatch, status):
     catalog = mock_catalog(monkeypatch, lambda _: httpx.Response(status))
     with pytest.raises(CardCatalogUnavailable):
         catalog.colors_for({str(UUID(int=1))})
+
+
+def test_name_lookup_scrolls_pages_and_rejects_ambiguous_aliases(monkeypatch):
+    first, second = str(UUID(int=10)), str(UUID(int=11))
+    calls = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        assert request.url.path == "/collections/cards/points/scroll"
+        assert body["with_vector"] is False
+        if "offset" not in body:
+            return httpx.Response(200, json={"result": {"points": [
+                {"id": first, "payload": {"name_keys": ["lightning bolt", "shared"]}},
+            ], "next_page_offset": first}})
+        return httpx.Response(200, json={"result": {"points": [
+            {"id": second, "payload": {"name_keys": ["fable", "shared"]}},
+        ], "next_page_offset": None}})
+
+    catalog = mock_catalog(monkeypatch, handler)
+    assert catalog.find_by_names({"lightning bolt", "fable", "shared"}) == {"lightning bolt": first, "fable": second}
+    assert len(calls) == 2

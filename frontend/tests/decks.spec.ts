@@ -17,12 +17,12 @@ const decks = [
   { id: 104, name: 'Artefaktai', card_count: 12, colors: [], colors_known: true },
 ]
 
-test('empty account sees count, invitation and future new deck button', async ({ page }) => {
+test('empty account sees count, invitation and new deck button', async ({ page }) => {
   await register(page)
   await expect(page.getByTestId('deck-count')).toHaveText('0 kaladžių')
   await expect(page.getByRole('heading', { name: 'Dar neturite kaladžių' })).toBeVisible()
   await expect(page.getByText('Sukurkite savo pirmąją kaladę.')).toBeVisible()
-  await expect(page.getByRole('button', { name: '+ Nauja kaladė', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '+ Nauja kaladė', exact: true })).toBeEnabled()
   await expect(page.getByRole('list', { name: 'Mano kaladžių sąrašas' })).toHaveCount(0)
 })
 

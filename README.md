@@ -2,7 +2,8 @@
 
 MTG kortų kaladžių kūrimo sistema. Šiuo metu veikia registracija,
 prisijungimas, atsijungimas, paskyros ištrynimas ir savo kaladžių sąrašo peržiūra.
-Kaladžių kūrimas, redagavimas ir kortų paieška bus pridėti vėliau.
+Galima kurti kalades ir importuoti tekstinius kortų sąrašus iš turimo kortų katalogo.
+Visas kaladžių redagavimas ir kortų paieška bus pridėti vėliau.
 
 ## Paleidimas su Docker
 

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .models import AuthSession, Deck, DeckCard, User
 from .card_catalog import CardCatalog, CardCatalogUnavailable, MANA_COLORS, get_card_catalog
+from .card_import import ImportResult, apply_card_import, parse_card_list
 
 app = FastAPI(title="Urza's Workshop", version="0.1.0")
 passwords = PasswordHash.recommended()
@@ -72,6 +73,20 @@ class DeckListOut(BaseModel):
     decks: list[DeckOut]
 
 
+class DeckCreate(BaseModel):
+    name: str = ""
+    card_list: str = ""
+
+
+class CardListImport(BaseModel):
+    card_list: str
+
+
+class DeckWriteOut(BaseModel):
+    deck: DeckOut
+    import_result: ImportResult | None = None
+
+
 Catalog = Annotated[CardCatalog, Depends(get_card_catalog)]
 
 
@@ -100,6 +115,25 @@ def summarize_decks(db: Session, decks: list[Deck], catalog: CardCatalog) -> lis
         colors=[color for color in MANA_COLORS if color in colors_by_deck[deck.id]],
         colors_known=known[deck.id],
     ) for deck in decks]
+
+
+def import_cards(db: Session, deck_id: int, card_list: str, catalog: CardCatalog) -> ImportResult:
+    if len(card_list) > 200_000:
+        raise HTTPException(422, {"errors": {"card_list": "Kortų sąrašas per ilgas."}})
+    lines, unrecognized = parse_card_list(card_list)
+    try:
+        oracle_ids = catalog.find_by_names({line.name for line in lines}) if lines else {}
+        return apply_card_import(db, deck_id, lines, oracle_ids, unrecognized)
+    except CardCatalogUnavailable:
+        raise HTTPException(503, "Nepavyko gauti kortų duomenų. Bandykite dar kartą.") from None
+    except ValueError as error:
+        raise HTTPException(422, {"errors": {"card_list": str(error)}}) from None
+
+
+def parse_deck_id(value: str) -> int:
+    if not value.isascii() or not value.isdigit() or len(value) > 10 or not 0 < int(value) <= 2_147_483_647:
+        raise HTTPException(404, "Kaladė nerasta.")
+    return int(value)
 
 
 def fingerprint(token: str) -> str:
@@ -221,11 +255,46 @@ def decks(session: CurrentSession, db: Db, catalog: Catalog):
     return DeckListOut(count=len(result), decks=result)
 
 
+@app.post("/api/decks", response_model=DeckWriteOut, status_code=201)
+def create_deck(data: DeckCreate, session: CurrentSession, db: Db, catalog: Catalog):
+    name = data.name.strip()
+    if len(name) > 100:
+        raise HTTPException(422, {"errors": {"name": "Pavadinimas negali būti ilgesnis nei 100 simbolių."}})
+    # Serialize creations for one owner, including automatic name assignment.
+    owner = db.scalar(select(User).where(User.id == session.user_id).with_for_update())
+    if owner is None:
+        raise HTTPException(401, EXPIRED_SESSION)
+    if not name:
+        existing_names = list(db.scalars(select(Deck.name).where(Deck.user_id == owner.id)))
+        number = len(existing_names) + 1
+        while f"Nauja kaladė {number}" in existing_names:
+            number += 1
+        name = f"Nauja kaladė {number}"
+    deck = Deck(user_id=owner.id, name=name)
+    db.add(deck)
+    db.flush()
+    result = import_cards(db, deck.id, data.card_list, catalog) if data.card_list.strip() else None
+    db.flush()
+    response = DeckWriteOut(deck=summarize_decks(db, [deck], catalog)[0], import_result=result)
+    db.commit()
+    return response
+
+
+@app.post("/api/decks/{deck_id}/import", response_model=DeckWriteOut)
+def import_into_deck(deck_id: str, data: CardListImport, session: CurrentSession, db: Db, catalog: Catalog):
+    owned = db.scalar(select(Deck).where(Deck.id == parse_deck_id(deck_id), Deck.user_id == session.user_id).with_for_update())
+    if owned is None:
+        raise HTTPException(404, "Kaladė nerasta.")
+    result = import_cards(db, owned.id, data.card_list, catalog)
+    db.flush()
+    response = DeckWriteOut(deck=summarize_decks(db, [owned], catalog)[0], import_result=result)
+    db.commit()
+    return response
+
+
 @app.get("/api/decks/{deck_id}", response_model=DeckOut)
 def deck(deck_id: str, session: CurrentSession, db: Db, catalog: Catalog):
-    if not deck_id.isascii() or not deck_id.isdigit() or len(deck_id) > 10 or not 0 < int(deck_id) <= 2_147_483_647:
-        raise HTTPException(404, "Kaladė nerasta.")
-    owned = db.scalar(select(Deck).where(Deck.id == int(deck_id), Deck.user_id == session.user_id))
+    owned = db.scalar(select(Deck).where(Deck.id == parse_deck_id(deck_id), Deck.user_id == session.user_id))
     if owned is None:
         raise HTTPException(404, "Kaladė nerasta.")
     return summarize_decks(db, [owned], catalog)[0]

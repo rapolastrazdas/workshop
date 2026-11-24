@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, ApiError, auth, clearSession } from '../auth'
 import { router } from '../router'
+import { showNotice } from '../notices'
 
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement>()
@@ -47,7 +48,7 @@ async function removeAccount() {
     await api('/auth/account', { method: 'DELETE', body: JSON.stringify({ password: password.value }) })
     password.value = ''
     clearSession()
-    auth.notice = 'Paskyra ištrinta.'
+    showNotice('Paskyra ištrinta.', '/')
     emit('close')
     await router.replace({ name: 'home' })
   } catch (error) {
@@ -66,7 +67,7 @@ async function removeAccount() {
 </script>
 
 <template>
-  <dialog ref="dialog" class="account-dialog" aria-labelledby="delete-title" aria-describedby="delete-description" @cancel="cancel">
+  <dialog ref="dialog" class="modal-dialog" aria-labelledby="delete-title" aria-describedby="delete-description" @cancel="cancel">
     <div class="dialog-header">
       <h2 id="delete-title">Šalinti paskyrą?</h2>
       <button class="dialog-close" type="button" aria-label="Uždaryti" :disabled="busy" @click="cancel()">×</button>
